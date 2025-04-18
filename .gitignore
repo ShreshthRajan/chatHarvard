@@ -6,6 +6,7 @@ __pycache__/
 
 # SQLite or other database directory
 db/
+nltk_data/
 
 # VSCode or other editor configs (optional)
 .vscode/
@@ -18,3 +19,5 @@ db/
 .env
 *.env
 venv/
+
+chatharvard.log
