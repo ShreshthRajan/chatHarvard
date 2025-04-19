@@ -12,6 +12,7 @@ from typing import Dict, List, Optional, Tuple, Set, Any, Union
 import os
 import pickle
 import logging
+from nltk.tokenize import word_tokenize as nltk_word_tokenize
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -82,9 +83,11 @@ except ImportError:
     logger.warning("nltk not available, text tokenization will use basic split")
     NLTK_AVAILABLE = False
 
-# Define fallback tokenization function if NLTK is not available
-if not NLTK_AVAILABLE:
-    def word_tokenize(text):
+def safe_word_tokenize(text: str) -> List[str]:
+    try:
+        return nltk_word_tokenize(text)
+    except Exception as e:
+        logger.warning(f"Falling back to basic tokenization due to error: {e}")
         return text.lower().split()
 
 class HarvardDatabase:
@@ -427,7 +430,39 @@ class HarvardDatabase:
             self.course_embeddings = None
             self.course_ids_for_embeddings = []
             self.embedding_index = None
-    
+    def get_course_workload(self, course_id=None, course_code=None):
+        """Directly retrieve course workload data from q_reports"""
+        if course_id is None and course_code is not None:
+            # Try to get course_id from code
+            course = self.get_course_by_code(course_code)
+            if course:
+                course_id = course.get('course_id')
+        
+        if course_id is None:
+            return None
+        
+        # Convert to int if it's not already
+        try:
+            course_id = int(course_id)
+        except (ValueError, TypeError):
+            return None
+        
+        # Direct lookup in q_reports_df
+        if hasattr(self, 'q_reports_df'):
+            q_report = self.q_reports_df[self.q_reports_df['course_id'] == course_id]
+            if not q_report.empty and 'mean_hours' in q_report.columns:
+                hours_val = q_report['mean_hours'].iloc[0]
+                if not pd.isna(hours_val):
+                    return hours_val
+        
+        # Fall back to course_dict if q_reports lookup failed
+        if course_id in self.course_dict and 'mean_hours' in self.course_dict[course_id]:
+            hours_val = self.course_dict[course_id].get('mean_hours')
+            if hours_val is not None and not pd.isna(hours_val):
+                return hours_val
+        
+        return None
+
     def _build_bm25_index(self):
         """Build BM25 index for keyword search with error handling"""
         try:
@@ -496,7 +531,7 @@ class HarvardDatabase:
         if NLTK_AVAILABLE:
             try:
                 # Tokenize
-                tokens = word_tokenize(text)
+                tokens = safe_word_tokenize(text)
                 
                 # Remove stopwords and non-alphabetic tokens
                 stop_words = set(stopwords.words('english'))

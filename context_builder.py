@@ -8,6 +8,7 @@ for more effective prompting with enhanced reasoning traces.
 
 from typing import Dict, List, Optional, Any
 import re
+import pandas as pd 
 
 class ContextBuilder:
     """Builds contextually rich prompts for the LLM with reasoning traces"""
@@ -20,41 +21,155 @@ class ContextBuilder:
         self.recommendations = recommendations
         self.student_profile = student_profile
         self.db = harvard_db
-    
+
+    def _build_workload_comparison_table(self) -> Optional[str]:
+        """Add explicit workload comparison table for comparison queries"""
+        # For any query related to workload or comparison
+        is_comparison = (self.query_info.get("intent") == "comparison" or 
+                        "compare" in self.query_info.get("original_query", "").lower() or
+                        "hours" in self.query_info.get("original_query", "").lower() or
+                        "workload" in self.query_info.get("original_query", "").lower())
+        
+        if not is_comparison:
+            return None
+            
+        courses = self.course_results.get("specific_courses", [])
+        
+        # For 130s level courses, find all if we're asking for them
+        if "130" in self.query_info.get("original_query", "").lower():
+            # Try to get all 130s math courses if needed
+            math_130s = []
+            for level in range(130, 140):
+                level_courses = self.db.get_courses_by_level_range("MATH", level, level)
+                math_130s.extend(level_courses)
+            
+            # Only use them if we don't already have courses or if we have very few
+            if not courses or len(courses) < 2:
+                courses = math_130s
+        
+        if len(courses) < 1:
+            return None
+
+        # Build table header
+        rows = [
+            "\n**Workload Comparison Table (Mean Hours per Week):**",
+            "| Course | Mean Hours | Q Score |",
+            "|--------|------------|---------|"
+        ]
+        
+        # Build table data
+        for c in courses:
+            name = c.get("class_tag", "UNKNOWN")
+            
+            # DIRECT DATABASE LOOKUP for workload data to avoid any data issues
+            course_id = c.get("course_id")
+            
+            # Try explicit workload retrieval
+            hours_val = None
+            if course_id:
+                hours_val = self.db.get_course_workload(course_id=course_id)
+            elif name:
+                hours_val = self.db.get_course_workload(course_code=name)
+                
+            # Format hours
+            if hours_val is not None and not pd.isna(hours_val):
+                try:
+                    hours_float = float(hours_val)
+                    hours_str = f"{hours_float:.1f}"
+                except (ValueError, TypeError):
+                    hours_str = "N/A"
+            else:
+                hours_str = "N/A"
+                
+            # Get Q score through similar direct lookup
+            qscore_val = None
+            if course_id and hasattr(self.db, 'q_reports_df'):
+                q_report = self.db.q_reports_df[self.db.q_reports_df['course_id'] == course_id]
+                if not q_report.empty and 'overall_score_course_mean' in q_report.columns:
+                    qscore_val = q_report['overall_score_course_mean'].iloc[0]
+                    
+            # Format Q score
+            if qscore_val is not None and not pd.isna(qscore_val):
+                try:
+                    qscore_float = float(qscore_val)
+                    qscore_str = f"{qscore_float:.2f}"
+                except (ValueError, TypeError):
+                    qscore_str = "N/A"
+            else:
+                qscore_str = "N/A"
+                
+            rows.append(f"| {name} | {hours_str} | {qscore_str} |")
+        
+        return "\n".join(rows)
+
+
+    def build_course_summary(course_row):
+        return (
+            f"{course_row['course_code']} - {course_row['title']}\n"
+            f"Professor: {course_row['professor']} | "
+            f"Q Score: {course_row['q_score']} | "
+            f"Workload: {course_row['mean_hours']} hrs/week | "
+            f"Difficulty: {course_row['difficulty']} | "
+            f"Recommendation: {course_row['would_recommend']}%\n"
+            f"Student Comments: {course_row['comments']}\n"
+        )
+
     def build_context(self) -> str:
         """Build a comprehensive context for the LLM with retrieval reasoning"""
         context_sections = []
         
-        # 1. Add query analysis with confidence scores
+        # Build workload comparison table FIRST for any comparison-related query
+        if "compare" in self.query_info.get("original_query", "").lower() or "hours" in self.query_info.get("original_query", "").lower() or "workload" in self.query_info.get("original_query", "").lower():
+            comparison_table = self._build_workload_comparison_table()
+            if comparison_table:
+                context_sections.append("IMPORTANT WORKLOAD DATA - USE THIS INFORMATION:")
+                context_sections.append(comparison_table)
+        
+        # Add query analysis with confidence scores
         context_sections.append(self._build_query_analysis())
         
-        # 2. Add retrieval reasoning trace
+        # Add retrieval reasoning trace
         context_sections.append(self._build_retrieval_reasoning())
         
-        # 3. Add specific courses section (if applicable)
+        # Add specific courses section (if applicable)
         if self.course_results.get("specific_courses"):
             context_sections.append(self._build_specific_courses_section())
+
+        # Inject full details for referenced courses in comparison queries to ensure LLM sees key metrics
+        if self.query_info.get("intent") == "comparison" and self.query_info.get("referenced_courses"):
+            context_sections.append("REFERENCED COURSES FOR COMPARISON:")
+            for code in self.query_info["referenced_courses"]:
+                course = self.db.get_course_by_code(code)
+                if course:
+                    context_sections.append(self._format_course_detail(course))
         
-        # 4. Add recommendations section (if applicable)
+        # Add recommendations section (if applicable)
         if self.recommendations.get("recommended_courses"):
             context_sections.append(self._build_recommendations_section())
         
-        # 5. Add relevant courses section (if applicable)
+        # Add relevant courses section (if applicable)
         if self.course_results.get("relevant_courses"):
             context_sections.append(self._build_relevant_courses_section())
         
-        # 6. Add verification and self-reflection
+        # Add verification and self-reflection
         context_sections.append(self._build_verification_section())
         
-        # 7. Add student profile section
+        # Add student profile section
         context_sections.append(self._build_student_profile_section())
         
-        # 8. Add concentration requirements if applicable
+        # Add concentration requirements if applicable
         if self.student_profile.get("concentration"):
             context_sections.append(self._build_concentration_section())
         
-        # 9. Add reasoning guidelines
+        # Add reasoning guidelines
         context_sections.append(self._build_reasoning_guidelines())
+        
+        # Double check for workload comparison table if it's not at the beginning
+        if "compare" in self.query_info.get("original_query", "").lower() or "hours" in self.query_info.get("original_query", "").lower() or "workload" in self.query_info.get("original_query", "").lower():
+            comparison_table = self._build_workload_comparison_table()
+            if comparison_table:
+                context_sections.append("\nREMINDER - IMPORTANT WORKLOAD DATA:")
+                context_sections.append(comparison_table)
         
         # Join all sections with double newlines
         return "\n\n".join(context_sections)
@@ -360,15 +475,18 @@ class ContextBuilder:
             guidelines.append("1. Focus on concentration requirements and how they relate to the student's progress")
             guidelines.append("2. Explain which courses would fulfill specific requirements")
             guidelines.append("3. Consider the student's course history when discussing remaining requirements")
-            guidelines.append("4. Be precise about specific requirement categories (e.g., AB0, AB1, AB2)")
+            guidelines.append("4. Be precise about specific requirement categories (e.g., AB0 (what is AB0), AB1 (what is AB1), AB2)")
         
         else:
             guidelines.append("1. Address the student's query directly based on the most relevant information provided")
             guidelines.append("2. Consider both the explicit and implicit aspects of the student's question")
             guidelines.append("3. Provide helpful context based on the student's academic background")
         
-        # Add general guidelines for all responses
-        guidelines.append("\nGeneral guidelines:")
+        # Add general guidelines for all responsesguidelines.append("\nGeneral guidelines:")
+        guidelines.append("- If a 'Workload Comparison Table' is provided, use it to directly compare course time commitments.")
+        guidelines.append("- Explicitly compare mean hours per week between courses.")
+        guidelines.append("- Prioritize structured data (tables, numeric values) over vague student impressions when available.")
+
         guidelines.append("- Be specific about course codes and names (e.g., MATH 131, CS 124)")
         guidelines.append("- Explain course ratings in context (e.g., 4.2/5.0 is considered good)")
         guidelines.append("- Interpret workload hours meaningfully (e.g., 8 hours/week is moderate)")
@@ -390,95 +508,112 @@ class ContextBuilder:
         return "\n".join(guidelines)
     
     def _format_course_detail(self, course: Dict) -> str:
-        """Format detailed course information with enhanced structure"""
+        """Format detailed course information with full Q guide context"""
         if not course:
             return ""
-        
-        details = []
-        
-        # Basic course info (with clear formatting)
-        if 'class_tag' in course and 'class_name' in course:
-            details.append(f"## {course['class_tag']} - {course['class_name']}")
-        
-        # Create sections for organized information
-        basic_info = []
-        ratings_info = []
-        content_info = []
-        logistics_info = []
-        
-        # Department and subject (basic info)
-        if 'department' in course and course['department']:
-            basic_info.append(f"Department: {course['department']}")
-        
-        # Term (basic info)
-        if 'term' in course and course['term']:
-            basic_info.append(f"Term: {course['term']}")
-        
-        # Instructors (basic info)
-        if 'instructors' in course and course['instructors']:
-            basic_info.append(f"Instructor(s): {course['instructors']}")
-        
-        # Q Guide data (ratings info)
-        if 'overall_score_course_mean' in course and course.get('overall_score_course_mean') is not None:
+
+        from ast import literal_eval
+
+        def safe_float(val):
             try:
-                score_value = float(course['overall_score_course_mean'])
-                ratings_info.append(f"Q Score: {score_value:.2f}/5.0")
+                return float(val)
             except (ValueError, TypeError):
-                ratings_info.append(f"Q Score: {course['overall_score_course_mean']}")
-        
-        if 'mean_hours' in course and course.get('mean_hours') is not None:
+                return None
+
+        def pct_block(prefix, fields):
+            return [
+                f"{label.replace('_', ' ').title()}: {course.get(field)}"
+                for label, field in fields
+                if course.get(field) is not None
+            ]
+
+        lines = []
+        lines.append(f"## {course.get('class_tag', 'UNKNOWN')} - {course.get('class_name', course.get('course_name', ''))}")
+        lines.append(f"**Instructor:** {course.get('instructors', course.get('instructor', 'N/A'))}")
+        lines.append(f"**Term:** {course.get('term', 'N/A')}")
+        mean_hours_val = course.get('mean_hours')
+        if isinstance(mean_hours_val, (int, float)):
+            lines.append(f"**Mean Hours per Week:** {mean_hours_val:.1f}")
+        else:
+            lines.append(f"**Mean Hours per Week:** {mean_hours_val or 'N/A'}")
+
+        lines.append(f"**Course Link:** {course.get('link', 'N/A')}")
+        # Overall Ratings
+        lines.append("\n**Overall Ratings**")
+        lines.extend(pct_block("Overall", [
+            ("Excellent", "overall_score_excellent"),
+            ("Very Good", "overall_score_very_good"),
+            ("Good", "overall_score_good"),
+            ("Fair", "overall_score_fair"),
+            ("Unsatisfactory", "overall_score_unsatisfactory"),
+            ("Course Mean", "overall_score_course_mean"),
+            ("FAS Mean", "overall_score_fas_mean"),
+        ]))
+
+        # Assignment Ratings
+        lines.append("\n**Assignment Ratings**")
+        lines.extend(pct_block("Assignments", [
+            ("Excellent", "assignments_excellent"),
+            ("Very Good", "assignments_very_good"),
+            ("Good", "assignments_good"),
+            ("Fair", "assignments_fair"),
+            ("Unsatisfactory", "assignments_unsatisfactory"),
+            ("Course Mean", "assignments_course_mean"),
+            ("FAS Mean", "assignments_fas_mean"),
+        ]))
+
+        # Materials Ratings
+        lines.append("\n**Materials Ratings**")
+        lines.extend(pct_block("Materials", [
+            ("Excellent", "materials_excellent"),
+            ("Very Good", "materials_very_good"),
+            ("Good", "materials_good"),
+            ("Fair", "materials_fair"),
+            ("Unsatisfactory", "materials_unsatisfactory"),
+            ("Course Mean", "materials_course_mean"),
+            ("FAS Mean", "materials_fas_mean"),
+        ]))
+
+        # Feedback Ratings
+        lines.append("\n**Feedback Ratings**")
+        lines.extend(pct_block("Feedback", [
+            ("Excellent", "feedback_excellent"),
+            ("Very Good", "feedback_very_good"),
+            ("Good", "feedback_good"),
+            ("Fair", "feedback_fair"),
+            ("Unsatisfactory", "feedback_unsatisfactory"),
+            ("Course Mean", "feedback_course_mean"),
+            ("FAS Mean", "feedback_fas_mean"),
+        ]))
+
+        # Section Ratings
+        lines.append("\n**Section Ratings**")
+        lines.extend(pct_block("Section", [
+            ("Excellent", "section_excellent"),
+            ("Very Good", "section_very_good"),
+            ("Good", "section_good"),
+            ("Fair", "section_fair"),
+            ("Unsatisfactory", "section_unsatisfactory"),
+            ("Course Mean", "section_course_mean"),
+            ("FAS Mean", "section_fas_mean"),
+        ]))
+
+        # Description / Requirements
+        if 'description' in course:
+            lines.append(f"\n**Description**: {course['description']}")
+        if 'course_requirements' in course:
+            lines.append(f"\n**Requirements**: {course['course_requirements']}")
+
+        # Comments
+        raw_comments = course.get("comments")
+        if isinstance(raw_comments, str) and raw_comments.strip() != "":
             try:
-                hours_value = float(course['mean_hours'])
-                ratings_info.append(f"Mean Hours: {hours_value:.1f} hours/week")
-            except (ValueError, TypeError):
-                ratings_info.append(f"Mean Hours: {course['mean_hours']} hours/week")
-        
-        # Description (content info)
-        if 'description' in course and course['description']:
-            desc = str(course['description'])
-            if len(desc) > 300:
-                desc = desc[:297] + "..."
-            content_info.append(f"Description: {desc}")
-        
-        # Requirements (logistics info)
-        if 'course_requirements' in course and course['course_requirements']:
-            req = str(course['course_requirements'])
-            if len(req) > 200:
-                req = req[:197] + "..."
-            logistics_info.append(f"Requirements: {req}")
-        
-        # Additional logistics
-        if 'room' in course and course['room']:
-            logistics_info.append(f"Location: {course['room']}")
-        
-        if 'days' in course and course['days']:
-            logistics_info.append(f"Days: {course['days']}")
-        
-        if 'start_times' in course and 'end_times' in course:
-            logistics_info.append(f"Time: {course.get('start_times')} - {course.get('end_times')}")
-        
-        # Q Guide comments (ratings info)
-        if 'comments' in course and course['comments'] and course.get('comments') is not None:
-            comments = str(course['comments'])
-            if len(comments) > 200:
-                comments = comments[:197] + "..."
-            ratings_info.append(f"Student Comments: {comments}")
-        
-        # Add the formatted sections
-        if basic_info:
-            details.append("Basic Information:")
-            details.extend([f"- {info}" for info in basic_info])
-        
-        if ratings_info:
-            details.append("Ratings and Workload:")
-            details.extend([f"- {info}" for info in ratings_info])
-        
-        if content_info:
-            details.append("Course Content:")
-            details.extend([f"- {info}" for info in content_info])
-        
-        if logistics_info:
-            details.append("Logistics and Requirements:")
-            details.extend([f"- {info}" for info in logistics_info])
-        
-        return "\n".join(details)
+                comments_list = literal_eval(raw_comments)
+                if isinstance(comments_list, list) and comments_list:
+                    lines.append("\n**Student Comments:**")
+                    for c in comments_list[:3]:  # Limit to 3 long comments for context
+                        lines.append(f"- {c.strip()}")
+            except Exception:
+                lines.append(f"\n**Student Comments (Raw):** {raw_comments.strip()}")
+
+        return "\n".join(lines)

@@ -267,7 +267,8 @@ class QueryProcessor:
                 (r'vs\.?', 0.9),
                 (r'or', 0.6),
                 (r'similar', 0.7),
-                (r'between', 0.8)
+                (r'between', 0.8),
+                (r'(compare|comparison of)\s+(.*)\s+(hours|workload)', 0.95)
             ],
             "schedule_planning": [
                 (r'schedule', 0.85),

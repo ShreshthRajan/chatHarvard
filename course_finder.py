@@ -141,7 +141,19 @@ class CourseFinder:
             
             for code in query_info["course_codes"]:
                 course = self.db.get_course_by_code(code)
+                
                 if course:
+                    # For comparison queries, ensure we have complete data including workload
+                    if query_info.get("intent") == "comparison":
+                        # If the course data is missing workload info, try direct database lookup
+                        if 'mean_hours' not in course or course['mean_hours'] is None:
+                            # Try getting q_report data directly
+                            course_id = course.get('course_id')
+                            if course_id and hasattr(self.db, 'q_reports_df'):
+                                q_report = self.db.q_reports_df[self.db.q_reports_df['course_id'] == course_id]
+                                if not q_report.empty and 'mean_hours' in q_report.columns:
+                                    course['mean_hours'] = q_report['mean_hours'].iloc[0]
+                    
                     specific_courses.append(course)
                 else:
                     # Reduce confidence if we couldn't find a mentioned course
