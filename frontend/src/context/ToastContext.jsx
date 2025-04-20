@@ -1,6 +1,5 @@
-// src/context/ToastContext.jsx - New context for toast management
 import React, { createContext, useContext, useState } from 'react';
-import { Toast } from '../components/components/toast';
+import Toast from '../components/Toast'; // <-- Correct the casing here
 
 const ToastContext = createContext();
 
@@ -20,7 +19,7 @@ export function ToastProvider({ children }) {
   return (
     <ToastContext.Provider value={{ addToast, removeToast }}>
       {children}
-      <div className="fixed bottom-0 right-0 p-6 space-y-4 z-50">
+      <div className="fixed top-4 right-4 z-50 space-y-4">
         {toasts.map((toast) => (
           <Toast
             key={toast.id}

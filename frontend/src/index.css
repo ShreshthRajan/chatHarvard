@@ -11,50 +11,120 @@
       sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    @apply bg-gray-50;
+    @apply bg-gray-50 text-gray-800;
   }
 
   code {
     font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
   }
+  
+  input[type="text"], 
+  input[type="password"], 
+  input[type="email"],
+  input[type="number"],
+  textarea,
+  select {
+    @apply transition-all duration-200;
+  }
+  
+  button {
+    @apply transition-all duration-200;
+  }
 }
 
 @layer components {
+  /* Button styles */
+  .btn {
+    @apply inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-lg text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all duration-200;
+  }
+  
+  .btn-primary {
+    @apply bg-harvard-crimson text-white hover:bg-harvard-dark focus:ring-harvard-crimson;
+  }
+  
+  .btn-secondary {
+    @apply bg-white text-gray-700 border-gray-300 hover:bg-gray-50 focus:ring-harvard-crimson;
+  }
+  
+  .btn-outline {
+    @apply bg-white text-harvard-crimson border-harvard-crimson hover:bg-harvard-light focus:ring-harvard-crimson;
+  }
+  
+  /* Input styles */
+  .input {
+    @apply block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-harvard-crimson focus:border-harvard-crimson sm:text-sm;
+  }
+  
+  /* Card styles */
+  .card {
+    @apply bg-white shadow-card rounded-xl border border-gray-100 overflow-hidden;
+  }
+  
+  .card-header {
+    @apply px-4 py-5 sm:px-6 border-b border-gray-200;
+  }
+  
+  .card-body {
+    @apply px-4 py-5 sm:p-6;
+  }
+  
+  .card-footer {
+    @apply px-4 py-3 bg-gray-50 sm:px-6 border-t border-gray-200;
+  }
+  
+  /* Badge styles */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+  
+  .badge-primary {
+    @apply bg-harvard-light text-harvard-crimson;
+  }
+  
+  .badge-secondary {
+    @apply bg-gray-100 text-gray-800;
+  }
+  
+  /* Loader */
+  .loader {
+    @apply animate-spin rounded-full border-t-2 border-b-2 border-harvard-crimson h-5 w-5;
+  }
+  
   /* Markdown styling */
   .prose pre {
-    @apply bg-gray-100 p-2 rounded text-sm;
+    @apply bg-gray-100 p-3 rounded-lg text-sm my-4 overflow-x-auto;
   }
 
   .prose code {
-    @apply bg-gray-100 px-1 py-0.5 rounded text-sm;
+    @apply bg-gray-100 px-1.5 py-0.5 rounded text-sm font-medium text-gray-800;
   }
 
   .prose h1 {
-    @apply text-2xl font-bold mt-6 mb-4;
+    @apply text-2xl font-bold mt-6 mb-4 text-gray-900;
   }
 
   .prose h2 {
-    @apply text-xl font-bold mt-5 mb-3;
+    @apply text-xl font-bold mt-5 mb-3 text-gray-900;
   }
 
   .prose h3 {
-    @apply text-lg font-bold mt-4 mb-2;
+    @apply text-lg font-bold mt-4 mb-2 text-gray-900;
   }
 
   .prose p {
-    @apply my-2;
+    @apply my-3 leading-relaxed;
   }
 
   .prose ul {
-    @apply list-disc pl-6 my-2;
+    @apply list-disc pl-6 my-3 space-y-1;
   }
 
   .prose ol {
-    @apply list-decimal pl-6 my-2;
+    @apply list-decimal pl-6 my-3 space-y-1;
   }
 
   .prose a {
-    @apply text-harvard-crimson hover:underline;
+    @apply text-harvard-crimson hover:underline font-medium;
   }
 
   .prose blockquote {
@@ -62,11 +132,11 @@
   }
 
   .prose table {
-    @apply border-collapse my-4 w-full;
+    @apply border-collapse my-4 w-full text-sm;
   }
 
   .prose th {
-    @apply border px-4 py-2 bg-gray-100 font-semibold;
+    @apply border px-4 py-2 bg-gray-100 font-semibold text-left;
   }
 
   .prose td {
@@ -75,6 +145,25 @@
 
   .prose hr {
     @apply my-6 border-t border-gray-300;
+  }
+  
+  /* Transitions */
+  .fade-enter {
+    opacity: 0;
+  }
+  
+  .fade-enter-active {
+    opacity: 1;
+    transition: opacity 200ms;
+  }
+  
+  .fade-exit {
+    opacity: 1;
+  }
+  
+  .fade-exit-active {
+    opacity: 0;
+    transition: opacity 200ms;
   }
 
   /* Custom scrollbar */
@@ -88,10 +177,26 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-gray-400 rounded;
+    @apply bg-gray-400 rounded-full;
   }
 
   ::-webkit-scrollbar-thumb:hover {
     @apply bg-gray-500;
   }
+}
+
+/* Animations */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.5) 50%, rgba(255,255,255,0) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
 }
