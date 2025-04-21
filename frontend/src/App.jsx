@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import axios from 'axios';
 import { Toaster } from 'react-hot-toast';
@@ -20,7 +20,11 @@ import { ToastProvider } from './context/ToastContext';
 import './index.css';
 
 // Configure axios defaults
-axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+axios.defaults.baseURL = 'http://localhost:5050';
+axios.defaults.withCredentials = true;
+axios.defaults.headers.common['Content-Type'] = 'application/json';
+
+// Add request interceptor
 axios.interceptors.request.use(config => {
   const token = localStorage.getItem('token');
   if (token) {
@@ -46,6 +50,18 @@ axios.interceptors.response.use(
 );
 
 function App() {
+  // Check for saved theme preference or use system preference on mount
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, []);
+
   return (
     <AuthProvider>
       <ToastProvider>
@@ -55,16 +71,17 @@ function App() {
             toastOptions={{
               duration: 3000,
               style: {
-                background: '#FFFFFF',
-                color: '#1F2937',
+                background: 'var(--toast-bg, #FFFFFF)',
+                color: 'var(--toast-text, #1F2937)',
                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                border: '1px solid #F3F4F6',
+                border: 'var(--toast-border, 1px solid #F3F4F6)',
                 borderRadius: '0.5rem',
                 padding: '0.75rem 1rem',
               },
+              className: 'dark:bg-dark-200 dark:text-dark-800 dark:border-dark-400',
               success: {
                 iconTheme: {
-                  primary: '#A51C30',
+                  primary: 'var(--toast-success, #A51C30)',
                   secondary: '#FFFFFF',
                 },
               },

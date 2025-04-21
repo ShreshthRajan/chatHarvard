@@ -122,14 +122,14 @@ function FileUpload({
 
   return (
     <div className="w-full">
-      <label className="block text-sm font-medium text-gray-700 mb-1">
+      <label className="block text-sm font-medium text-gray-700 dark:text-dark-700 mb-1">
         {label}
       </label>
       <div
         className={`mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
-          isDragging ? 'border-harvard-crimson bg-harvard-light bg-opacity-20' :
-          disabled ? 'border-gray-200 bg-gray-50 cursor-not-allowed' :
-          'border-gray-300 hover:border-harvard-crimson'
+          isDragging ? 'border-accent-primary dark:border-accent-secondary bg-accent-primary bg-opacity-5 dark:bg-opacity-10' :
+          disabled ? 'border-gray-200 dark:border-dark-500 bg-gray-50 dark:bg-dark-300 cursor-not-allowed' :
+          'border-gray-300 dark:border-dark-400 hover:border-accent-primary dark:hover:border-accent-secondary'
         }`}
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
@@ -141,7 +141,7 @@ function FileUpload({
           {!file ? (
             <>
               <svg
-                className={`mx-auto h-12 w-12 ${disabled ? 'text-gray-300' : 'text-gray-400'}`}
+                className={`mx-auto h-12 w-12 ${disabled ? 'text-gray-300 dark:text-dark-500' : 'text-gray-400 dark:text-dark-600'}`}
                 stroke="currentColor"
                 fill="none"
                 viewBox="0 0 48 48"
@@ -154,35 +154,35 @@ function FileUpload({
                   strokeLinejoin="round"
                 />
               </svg>
-              <div className="flex text-sm text-gray-600">
+              <div className="flex text-sm text-gray-600 dark:text-dark-600">
                 <label
                   htmlFor="file-upload"
                   className={`relative font-medium ${
-                    disabled ? 'text-gray-400' : 'text-harvard-crimson hover:text-harvard-dark'
+                    disabled ? 'text-gray-400 dark:text-dark-500' : 'text-accent-primary dark:text-accent-secondary hover:text-accent-tertiary dark:hover:text-accent-primary'
                   }`}
                 >
                   {disabled ? 'Upload disabled' : 'Upload a file'}
                 </label>
-                <p className="pl-1 text-gray-500">{disabled ? '' : 'or drag and drop'}</p>
+                <p className="pl-1 text-gray-500 dark:text-dark-600">{disabled ? '' : 'or drag and drop'}</p>
               </div>
-              <p className="text-xs text-gray-500">{helperText}</p>
-              <p className="text-xs text-gray-500">Maximum file size: {maxSize}MB</p>
+              <p className="text-xs text-gray-500 dark:text-dark-600">{helperText}</p>
+              <p className="text-xs text-gray-500 dark:text-dark-600">Maximum file size: {maxSize}MB</p>
             </>
           ) : (
             <div className="flex items-center justify-center space-x-2">
-              <div className="flex items-center bg-gray-100 py-2 px-3 rounded-lg text-sm text-gray-900">
-                <svg className="h-5 w-5 text-gray-500 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="flex items-center bg-gray-100 dark:bg-dark-300 py-2 px-3 rounded-lg text-sm text-gray-900 dark:text-dark-800">
+                <svg className="h-5 w-5 text-gray-500 dark:text-dark-600 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                 </svg>
                 <span className="truncate max-w-xs">{file.name}</span>
-                <span className="text-xs text-gray-500 ml-2">
+                <span className="text-xs text-gray-500 dark:text-dark-600 ml-2">
                   ({(file.size / 1024 / 1024).toFixed(2)} MB)
                 </span>
                 {!loading && (
                   <button
                     type="button"
                     onClick={handleRemoveFile}
-                    className="ml-2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                    className="ml-2 text-gray-500 dark:text-dark-600 hover:text-gray-700 dark:hover:text-dark-700 focus:outline-none"
                   >
                     <svg className="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -208,7 +208,7 @@ function FileUpload({
         />
       </div>
       {error && (
-        <p className="mt-2 text-sm text-red-600">{error}</p>
+        <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>
       )}
     </div>
   );

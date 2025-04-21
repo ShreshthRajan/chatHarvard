@@ -5,6 +5,8 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { PaperAirplaneIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import Navbar from '../components/Navbar';
+import { CourseComparisonModal } from '../components/CourseComparisonModal';
+import CourseCard from '../components/CourseCard';
 
 function Chat() {
   const navigate = useNavigate();
@@ -13,7 +15,10 @@ function Chat() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [hasProfile, setHasProfile] = useState(false);
+  const [compareModalOpen, setCompareModalOpen] = useState(false);
+  const [coursesToCompare, setCoursesToCompare] = useState([]);
   const messagesEndRef = useRef(null);
+  const inputRef = useRef(null);
   
   // Fetch chat history and profile
   useEffect(() => {
@@ -86,6 +91,46 @@ Ask me anything about Harvard academics or try one of these examples:
     }
   }, [loading, messages.length, hasProfile]);
   
+  // Function to check if the message is a course information request
+  const isCourseInfoRequest = (content) => {
+    // Check if content contains a course code pattern
+    const courseCodePattern = /([A-Za-z]{2,4})\s*(\d{1,3}[A-Za-z]*)/i;
+    return courseCodePattern.test(content) && 
+           !content.toLowerCase().includes('compare') &&
+           (content.toLowerCase().includes('what is') || 
+            content.toLowerCase().includes('tell me about') || 
+            content.toLowerCase().includes('course information') ||
+            content.toLowerCase().includes('info on') ||
+            content.toLowerCase().includes('details about'));
+  };
+  
+  // Function to extract course code from message
+  const extractCourseCode = (content) => {
+    const match = content.match(/([A-Za-z]{2,4})\s*(\d{1,3}[A-Za-z]*)/i);
+    if (match) {
+      return `${match[1].toUpperCase()} ${match[2]}`;
+    }
+    return null;
+  };
+  
+  // Generate mock course data
+  const generateCourseData = (courseCode) => {
+    const mockCourseData = {
+      code: courseCode,
+      title: `${courseCode} - Sample Course Title`,
+      description: "This is a sample course description that would typically provide an overview of the course content, objectives, and learning outcomes. This description helps students understand what to expect from the course.",
+      instructor: "Professor Sample",
+      term: "Spring 2025",
+      rating: 4.2,
+      workload: 8,
+      prerequisites: ["MATH 1A", "CS 50"],
+      enrollment: 120,
+      tags: ["Quantitative Reasoning", "Departmental Requirement"]
+    };
+    
+    return mockCourseData;
+  };
+  
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -100,7 +145,56 @@ Ask me anything about Harvard academics or try one of these examples:
     
     try {
       const response = await axios.post('/api/chat/message', { message: userMessage });
-      setMessages(response.data.history);
+      
+      let updatedResponse = response.data.history;
+      
+      // Check if response contains course comparison request
+      if (userMessage.toLowerCase().includes('compare')) {
+        const courseCodes = userMessage.match(/([A-Za-z]{2,4})\s*(\d{1,3}[A-Za-z]*)/g);
+        if (courseCodes && courseCodes.length >= 2) {
+          // Mock course data - in a real app, you'd fetch from your backend
+          setCoursesToCompare([
+            {
+              courseCode: courseCodes[0],
+              title: `Sample Course ${courseCodes[0]}`,
+              instructor: "Professor Smith",
+              qScore: 4.2,
+              workload: 8,
+              description: "This is a sample course description for comparison purposes."
+            },
+            {
+              courseCode: courseCodes[1],
+              title: `Sample Course ${courseCodes[1]}`,
+              instructor: "Professor Johnson",
+              qScore: 3.8,
+              workload: 12,
+              description: "This is another sample course description for comparison purposes."
+            }
+          ]);
+          
+          // Wait for state update then open modal
+          setTimeout(() => {
+            setCompareModalOpen(true);
+          }, 500);
+        }
+      } 
+      // Check if this is a specific course information request
+      else if (isCourseInfoRequest(userMessage)) {
+        const courseCode = extractCourseCode(userMessage);
+        if (courseCode) {
+          // For course info requests, add a special type to render as a card
+          const lastMessage = updatedResponse[updatedResponse.length - 1];
+          const courseData = generateCourseData(courseCode);
+          
+          // Add a courseData property to the message
+          updatedResponse[updatedResponse.length - 1] = {
+            ...lastMessage,
+            courseData
+          };
+        }
+      }
+      
+      setMessages(updatedResponse);
     } catch (error) {
       console.error('Error sending message:', error);
       // Add error message
@@ -113,6 +207,8 @@ Ask me anything about Harvard academics or try one of these examples:
       ]);
     } finally {
       setSending(false);
+      // Focus the input field after sending
+      inputRef.current?.focus();
     }
   };
   
@@ -125,10 +221,40 @@ Ask me anything about Harvard academics or try one of these examples:
     }
   };
   
+  // Function to render course card when appropriate
+  const renderMessageContent = (message) => {
+    if (message.role === 'assistant' && message.courseData) {
+      return (
+        <div className="mb-4">
+          <div className="prose prose-sm max-w-none dark:prose-dark mb-4">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {message.content}
+            </ReactMarkdown>
+          </div>
+          <div className="mt-4 bg-white dark:bg-dark-300 rounded-lg shadow-sm overflow-hidden border border-gray-200 dark:border-dark-400">
+            <CourseCard course={message.courseData} />
+          </div>
+        </div>
+      );
+    } else if (message.role === 'assistant') {
+      return (
+        <div className="prose prose-sm max-w-none dark:prose-dark">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {message.content}
+          </ReactMarkdown>
+        </div>
+      );
+    } else {
+      return (
+        <p className="whitespace-pre-wrap">{message.content}</p>
+      );
+    }
+  };
+  
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex justify-center items-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-harvard-crimson"></div>
+      <div className="min-h-screen bg-gray-50 dark:bg-dark-100 flex justify-center items-center transition-colors">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-accent-primary"></div>
       </div>
     );
   }
@@ -140,112 +266,120 @@ Ask me anything about Harvard academics or try one of these examples:
   return (
     <>
       <Navbar />
-      <div className="flex flex-col h-screen bg-gradient-to-b from-gray-50 to-white">
-        {/* Enhanced Header */}
-        <div className="py-3 border-b border-gray-200 bg-white shadow-sm flex items-center justify-between px-4 md:px-6">
-          <div className="flex items-center">
-            <span className="text-2xl mr-2">🎓</span>
-            <h1 className="text-lg font-semibold bg-clip-text text-transparent bg-gradient-to-r from-harvard-crimson to-harvard-dark">ChatHarvard</h1>
-          </div>
-          <button
-            onClick={handleClearChat}
-            className="flex items-center text-sm text-gray-500 hover:text-gray-700 px-3 py-1 rounded-full border border-gray-200 hover:bg-gray-50 transition-colors duration-150"
-          >
-            <ArrowPathIcon className="h-4 w-4 mr-1" />
-            Clear Chat
-          </button>
-        </div>
-        
-        {/* Enhanced Messages Container */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-gray-50">
-        {messages.length === 0 && !sending && (
-            <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 space-y-4">
-              <div className="text-5xl mb-2">🎓</div>
-              <h2 className="text-xl font-semibold text-gray-700">Welcome to ChatHarvard</h2>
-              <p className="max-w-md text-sm">Your personal academic advisor for Harvard University. Ask me anything about courses, requirements, or get personalized recommendations.</p>
-            </div>
-          )}
-          
-          {messages.map((message, index) => (
-            <div
-              key={index}
-              className={`flex ${messages[index].role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}
-            >
-              <div 
-                className={`max-w-3xl p-4 rounded-2xl shadow-sm ${
-                  message.role === 'user' 
-                    ? 'bg-harvard-light border border-chat-border text-gray-900' 
-                    : 'bg-white border border-gray-100 text-gray-800'
-                } transition-all duration-300`}
-                style={{ width: 'fit-content', maxWidth: '90%' }}
-              >
-                {message.role === 'assistant' ? (
-                  <div className="prose prose-sm max-w-none">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {message.content}
-                    </ReactMarkdown>
+      <div className="flex flex-col h-screen bg-gray-50 dark:bg-dark-100 transition-colors">
+        {/* Chat container */}
+        <div className="flex-1 overflow-hidden flex flex-col">
+          {/* Messages container with Claude.ai-like styling */}
+          <div className="flex-1 overflow-y-auto px-4 md:px-6 max-w-4xl mx-auto w-full">
+            {messages.length === 0 && !sending && (
+              <div className="flex flex-col items-center justify-center h-full welcome-message">
+                <div className="text-4xl mb-2">🎓</div>
+                <h2>Welcome to ChatHarvard</h2>
+                <p>Your personal academic advisor for Harvard University. Ask me anything about courses, requirements, or get personalized recommendations.</p>
+              </div>
+            )}
+            
+            <div className="message-container space-y-1 py-6">
+              {messages.map((message, index) => (
+                <div
+                  key={index}
+                  className="animate-fade-in mb-6"
+                >
+                  <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-dark-500 mb-1">
+                    <span className="font-medium">
+                      {message.role === 'assistant' ? 'ChatHarvard' : 'You'}
+                    </span>
+                    <span className="text-gray-400 dark:text-dark-600">•</span>
+                    <span className="text-gray-400 dark:text-dark-600">{new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                   </div>
-                ) : (
-                  <p className="whitespace-pre-wrap">{message.content}</p>
-                )}
-                <div className="text-xs text-gray-400 mt-2 flex justify-end">
-                  {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                  <div 
+                    className={`py-2 ${
+                      message.role === 'user' 
+                        ? 'pl-3 border-l-2 border-gray-300 dark:border-dark-500' 
+                        : ''
+                    }`}
+                  >
+                    {renderMessageContent(message)}
+                  </div>
                 </div>
-              </div>
+              ))}
+              
+              {/* Enhanced loading indicator */}
+              {sending && (
+                <div className="animate-fade-in mb-6">
+                  <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-dark-500 mb-1">
+                    <span className="font-medium">ChatHarvard</span>
+                    <span className="text-gray-400 dark:text-dark-600">•</span>
+                    <span className="text-gray-400 dark:text-dark-600">{new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                  </div>
+                  <div className="py-2">
+                    <div className="flex items-center space-x-3">
+                      <div className="h-2 w-2 rounded-full bg-accent-primary animate-pulse"></div>
+                      <div className="h-2 w-2 rounded-full bg-accent-primary animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                      <div className="h-2 w-2 rounded-full bg-accent-primary animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-          ))}
+            <div ref={messagesEndRef} />
+          </div>
           
-          {/* Enhanced loading indicator */}
-          {sending && (
-            <div className="flex justify-start">
-              <div className="bg-white border border-gray-100 p-5 rounded-2xl shadow-sm">
-                <div className="flex items-center space-x-3">
-                  <div className="h-2.5 w-2.5 rounded-full bg-harvard-crimson animate-pulse"></div>
-                  <div className="h-2.5 w-2.5 rounded-full bg-harvard-crimson animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                  <div className="h-2.5 w-2.5 rounded-full bg-harvard-crimson animate-pulse" style={{ animationDelay: '0.4s' }}></div>
-                </div>
+          {/* Input container - fixed at bottom with Claude.ai-like styling */}
+          <div className="border-t border-gray-200 dark:border-dark-400 bg-white dark:bg-dark-200 py-4 px-4 md:px-6 transition-colors">
+            <div className="max-w-4xl mx-auto">
+              <div className="flex items-center justify-between mb-3">
+                <button
+                  onClick={handleClearChat}
+                  className="flex items-center text-xs text-gray-500 dark:text-dark-600 hover:text-gray-700 dark:hover:text-dark-700 px-3 py-1 rounded-md border border-gray-200 dark:border-dark-400 hover:bg-gray-50 dark:hover:bg-dark-300 transition-colors duration-150"
+                >
+                  <ArrowPathIcon className="h-3 w-3 mr-1" />
+                  Clear Chat
+                </button>
               </div>
+              
+              <form onSubmit={handleSubmit} className="relative">
+                <input
+                  type="text"
+                  ref={inputRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  disabled={sending}
+                  placeholder="Ask about Harvard courses, requirements, or get recommendations..."
+                  className="w-full border border-gray-300 dark:border-dark-400 rounded-lg px-6 py-3 pr-16 shadow-sm focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-transparent dark:bg-dark-300 dark:text-dark-700 dark:placeholder-dark-500 transition-all duration-200"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSubmit(e);
+                    }
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={sending || !input.trim()}
+                  className={`absolute right-2 top-1/2 transform -translate-y-1/2 p-2.5 rounded-lg ${
+                    sending || !input.trim()
+                      ? 'bg-gray-300 dark:bg-dark-400 text-gray-500 dark:text-dark-500 cursor-not-allowed'
+                      : 'bg-accent-primary text-white hover:bg-accent-tertiary'
+                  } transition-colors shadow-sm`}
+                >
+                  <PaperAirplaneIcon className="h-5 w-5" />
+                </button>
+                <div className="text-xs text-gray-400 dark:text-dark-500 text-center mt-2">
+                  Press Enter to send • Shift+Enter for new line
+                </div>
+              </form>
             </div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
-        
-        {/* Enhanced Input Container */}
-        <div className="border-t border-gray-200 bg-white p-4 md:p-6">
-          <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
-            <div className="relative">
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                disabled={sending}
-                placeholder="Ask about Harvard courses, requirements, or get recommendations..."
-                className="w-full border border-gray-300 rounded-full px-6 py-3.5 pr-16 shadow-sm focus:outline-none focus:ring-2 focus:ring-harvard-crimson focus:border-transparent transition-all duration-200"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSubmit(e);
-                  }
-                }}
-              />
-              <button
-                type="submit"
-                disabled={sending || !input.trim()}
-                className={`absolute right-2 top-1/2 transform -translate-y-1/2 p-2 rounded-full ${
-                  sending || !input.trim()
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-harvard-crimson text-white hover:bg-harvard-dark'
-                } transition-colors shadow-sm`}
-              >
-                <PaperAirplaneIcon className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="text-xs text-gray-400 text-center mt-2">
-              Press Enter to send • Shift+Enter for new line
-            </div>
-          </form>
+          </div>
         </div>
       </div>
+      
+      {/* Course Comparison Modal */}
+      <CourseComparisonModal 
+        isOpen={compareModalOpen} 
+        onClose={() => setCompareModalOpen(false)} 
+        courses={coursesToCompare} 
+      />
     </>
   );
 }

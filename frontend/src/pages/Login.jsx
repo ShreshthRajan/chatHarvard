@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
-import { toast } from 'react-hot-toast';
+import toast from 'react-hot-toast';
+import ThemeToggleButton from '../components/ThemeToggleButton';
 
 function Login() {
   const { currentUser, setCurrentUser, setAuthProvider } = useAuth();
@@ -27,42 +28,42 @@ function Login() {
     setShareableLink(`${baseUrl}/#/shared/${randomId}`);
   }, [currentUser, navigate]);
 
-  // Validate API key when changed with debounce
-  useEffect(() => {
-    if (!apiKey || apiKey.length < 10) return;
-    
-    const timer = setTimeout(() => {
-      validateApiKey();
-    }, 800);
-    
-    return () => clearTimeout(timer);
-  }, [apiKey, provider]);
-
   const validateApiKey = async () => {
     if (!apiKey || apiKey.trim() === '') return;
     
     setValidating(true);
+    setError('');
     try {
-      // Simple validation request that doesn't create a session yet
-      const response = await axios.post('/api/auth/validate_key', {
-        provider: provider,
-        api_key: apiKey
-      });
-      
-      if (response.data.valid) {
-        setError('');
-        toast.success('API key is valid!');
+      // For now, let's just do basic validation without a network call
+      // since we haven't confirmed the validate_key endpoint is working
+      if (provider === 'openai' && !apiKey.startsWith('sk-')) {
+        setError('OpenAI API key should start with sk-');
+        toast.error('Invalid OpenAI API key format');
+      } else if (provider === 'anthropic' && !apiKey.startsWith('sk-ant')) {
+        setError('Anthropic API key should start with sk-ant-');
+        toast.error('Invalid Anthropic API key format');
       } else {
-        setError('Invalid API key');
-        toast.error('Invalid API key');
+        // Valid format
+        setError('');
       }
     } catch (err) {
       console.error('Validation failed:', err);
-      setError(err.response?.data?.error || err.message || 'API key validation failed');
+      setError('API key validation failed');
     } finally {
       setValidating(false);
     }
   };
+
+  // Call validation when key changes
+  useEffect(() => {
+    if (apiKey && apiKey.length > 8) {
+      const timer = setTimeout(() => {
+        validateApiKey();
+      }, 800);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [apiKey, provider]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -111,39 +112,44 @@ function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-dark-50 dark:to-dark-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8 transition-colors">
+      {/* Theme toggle in top right */}
+      <div className="absolute top-4 right-4">
+        <ThemeToggleButton />
+      </div>
+      
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
-          <div className="h-16 w-16 rounded-full bg-gradient-to-br from-harvard-crimson to-harvard-dark flex items-center justify-center text-white text-3xl shadow-lg">
+          <div className="h-16 w-16 rounded-full bg-gradient-to-br from-accent-primary to-accent-tertiary flex items-center justify-center text-white text-3xl shadow-lg dark:shadow-glow-dark">
             🎓
           </div>
         </div>
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-dark-800">
           ChatHarvard
         </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
+        <p className="mt-2 text-center text-sm text-gray-600 dark:text-dark-600">
           Your Personal Academic Advisor for Harvard University
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow-xl sm:rounded-xl sm:px-10 border border-gray-100">
+        <div className="bg-white dark:bg-dark-200 py-8 px-4 shadow-xl dark:shadow-card-dark sm:rounded-xl sm:px-10 border border-gray-100 dark:border-dark-300">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <p className="text-sm font-medium text-gray-700 mb-4 text-center">
+              <p className="text-sm font-medium text-gray-700 dark:text-dark-700 mb-4 text-center">
                 Choose your AI provider
               </p>
               
               <div className="mt-4 space-y-4">
-                <label className="block text-sm font-medium text-gray-700">Provider</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-dark-700">Provider</label>
                 <div className="mt-1 grid grid-cols-2 gap-3">
                   <button
                     type="button"
                     onClick={() => setProvider('openai')}
                     className={`flex justify-center items-center py-2 px-3 border ${
                       provider === 'openai' 
-                        ? 'border-harvard-crimson bg-harvard-light text-harvard-crimson' 
-                        : 'border-gray-300 bg-white text-gray-700'
+                        ? 'border-accent-primary bg-accent-primary bg-opacity-10 text-accent-primary dark:border-accent-primary dark:bg-opacity-20 dark:text-accent-secondary' 
+                        : 'border-gray-300 dark:border-dark-400 bg-white dark:bg-dark-300 text-gray-700 dark:text-dark-700'
                     } rounded-md shadow-sm text-sm font-medium focus:outline-none transition-all duration-150`}
                   >
                     OpenAI (GPT-4)
@@ -153,8 +159,8 @@ function Login() {
                     onClick={() => setProvider('anthropic')}
                     className={`flex justify-center items-center py-2 px-3 border ${
                       provider === 'anthropic' 
-                        ? 'border-harvard-crimson bg-harvard-light text-harvard-crimson' 
-                        : 'border-gray-300 bg-white text-gray-700'
+                        ? 'border-accent-primary bg-accent-primary bg-opacity-10 text-accent-primary dark:border-accent-primary dark:bg-opacity-20 dark:text-accent-secondary' 
+                        : 'border-gray-300 dark:border-dark-400 bg-white dark:bg-dark-300 text-gray-700 dark:text-dark-700'
                     } rounded-md shadow-sm text-sm font-medium focus:outline-none transition-all duration-150`}
                   >
                     Anthropic (Claude)
@@ -162,7 +168,7 @@ function Login() {
                 </div>
                 
                 <div className="mt-3">
-                  <label htmlFor="api-key" className="block text-sm font-medium text-gray-700">API Key (Optional)</label>
+                  <label htmlFor="api-key" className="block text-sm font-medium text-gray-700 dark:text-dark-700">API Key (Optional)</label>
                   <div className="mt-1">
                     <div className="relative rounded-md shadow-sm">
                       <input
@@ -171,11 +177,14 @@ function Login() {
                         placeholder="Paste your API key or leave blank for default"
                         value={apiKey}
                         onChange={(e) => setApiKey(e.target.value)}
-                        className={`w-full px-3 py-2 border ${error ? 'border-red-300' : 'border-gray-300'} rounded-md shadow-sm focus:ring-harvard-crimson focus:border-harvard-crimson sm:text-sm pr-10`}
+                        className={`w-full px-3 py-2 border ${error ? 'border-accent-error dark:border-accent-error' : 'border-gray-300 dark:border-dark-400'} 
+                          rounded-md shadow-sm focus:ring-accent-primary focus:border-accent-primary 
+                          dark:bg-dark-300 dark:text-dark-700 dark:placeholder-dark-500 
+                          sm:text-sm pr-10 transition-colors`}
                       />
                       {validating && (
                         <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-                          <svg className="animate-spin h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <svg className="animate-spin h-5 w-5 text-gray-400 dark:text-dark-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                           </svg>
@@ -183,30 +192,30 @@ function Login() {
                       )}
                       {!validating && !error && apiKey && (
                         <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-                          <svg className="h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                          <svg className="h-5 w-5 text-green-500 dark:text-green-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
                           </svg>
                         </div>
                       )}
                       {!validating && error && (
                         <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-                          <svg className="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                          <svg className="h-5 w-5 text-accent-error dark:text-accent-error" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
                           </svg>
                         </div>
                       )}
                     </div>
                   </div>
-                  <p className="mt-1 text-xs text-gray-500">
+                  <p className="mt-1 text-xs text-gray-500 dark:text-dark-600">
                     Leave blank to use our default {provider} key
                   </p>
                 </div>
                 
                 {error && (
-                  <div className="rounded-md bg-red-50 p-4">
+                  <div className="rounded-md bg-red-50 dark:bg-accent-error dark:bg-opacity-10 p-4">
                     <div className="flex">
                       <div className="ml-3">
-                        <h3 className="text-sm font-medium text-red-800">
+                        <h3 className="text-sm font-medium text-accent-error dark:text-accent-error">
                           {error}
                         </h3>
                       </div>
@@ -217,7 +226,7 @@ function Login() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-harvard-crimson to-harvard-dark hover:from-harvard-dark hover:to-harvard-crimson focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-harvard-crimson transition-all duration-200"
+                  className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-md text-sm font-medium text-white bg-accent-primary hover:bg-accent-tertiary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent-primary dark:focus:ring-accent-secondary transition-all duration-200"
                 >
                   {loading ? (
                     <>
@@ -234,15 +243,15 @@ function Login() {
           </form>
 
           <div className="mt-8">
-            <div className="rounded-lg bg-gradient-to-r from-gray-50 to-gray-100 p-4 border border-gray-200">
+            <div className="rounded-lg bg-gray-50 dark:bg-dark-300 p-4 border border-gray-200 dark:border-dark-400">
               <div className="flex">
                 <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <svg className="h-5 w-5 text-gray-400 dark:text-dark-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                     <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
                   </svg>
                 </div>
                 <div className="ml-3">
-                  <p className="text-sm text-gray-700">
+                  <p className="text-sm text-gray-700 dark:text-dark-700">
                     Sign in to access personalized academic recommendations based on your course history.
                   </p>
                 </div>
@@ -250,11 +259,11 @@ function Login() {
             </div>
           </div>
 
-          <div className="mt-4 border-t border-gray-200 pt-4">
+          <div className="mt-4 border-t border-gray-200 dark:border-dark-400 pt-4">
             <button
               type="button"
               onClick={() => setShowShareLink(!showShareLink)}
-              className="text-sm text-harvard-crimson hover:text-harvard-dark font-medium"
+              className="text-sm text-accent-primary dark:text-accent-secondary hover:text-accent-tertiary dark:hover:text-accent-primary font-medium"
             >
               {showShareLink ? "Hide sharing link" : "Share this app"}
             </button>
@@ -266,19 +275,19 @@ function Login() {
                     type="text"
                     readOnly
                     value={shareableLink}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm bg-gray-50"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-dark-400 rounded-md shadow-sm text-sm bg-gray-50 dark:bg-dark-300 dark:text-dark-700"
                   />
                   <button
                     type="button"
                     onClick={handleCopyShareLink}
-                    className="p-2 bg-harvard-light text-harvard-crimson rounded-md hover:bg-harvard-crimson hover:text-white transition-colors"
+                    className="p-2 bg-accent-primary bg-opacity-10 text-accent-primary dark:bg-opacity-20 dark:text-accent-secondary rounded-md hover:bg-accent-primary hover:text-white dark:hover:bg-accent-primary transition-colors"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
                     </svg>
                   </button>
                 </div>
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-gray-500 dark:text-dark-600">
                   Share this link with others to let them try ChatHarvard
                 </p>
               </div>

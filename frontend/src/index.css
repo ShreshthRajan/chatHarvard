@@ -11,7 +11,8 @@
       sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    @apply bg-gray-50 text-gray-800;
+    @apply bg-gray-50 text-gray-800 dark:bg-dark-100 dark:text-dark-700;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
 
   code {
@@ -24,11 +25,33 @@
   input[type="number"],
   textarea,
   select {
-    @apply transition-all duration-200;
+    @apply transition-all duration-200 dark:bg-dark-300 dark:border-dark-400 dark:text-dark-700 dark:placeholder-dark-500;
   }
   
   button {
     @apply transition-all duration-200;
+  }
+  
+  /* Dark mode scrollbar */
+  .dark ::-webkit-scrollbar-track {
+    @apply bg-dark-200;
+  }
+
+  .dark ::-webkit-scrollbar-thumb {
+    @apply bg-dark-400;
+  }
+
+  .dark ::-webkit-scrollbar-thumb:hover {
+    @apply bg-dark-500;
+  }
+  
+  /* Base styles for headings */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-medium dark:text-dark-800;
+  }
+  
+  a {
+    @apply transition-colors duration-200;
   }
 }
 
@@ -39,29 +62,48 @@
   }
   
   .btn-primary {
-    @apply bg-harvard-crimson text-white hover:bg-harvard-dark focus:ring-harvard-crimson;
+    @apply bg-accent-primary text-white hover:bg-accent-tertiary focus:ring-accent-primary 
+           dark:bg-accent-primary dark:hover:bg-accent-tertiary dark:focus:ring-accent-secondary shadow-md hover:shadow-lg;
   }
   
   .btn-secondary {
-    @apply bg-white text-gray-700 border-gray-300 hover:bg-gray-50 focus:ring-harvard-crimson;
+    @apply bg-white text-gray-700 border-gray-300 hover:bg-gray-50 focus:ring-accent-primary
+           dark:bg-dark-300 dark:text-dark-700 dark:border-dark-400 dark:hover:bg-dark-400 shadow-subtle dark:shadow-subtle-dark;
   }
   
   .btn-outline {
-    @apply bg-white text-harvard-crimson border-harvard-crimson hover:bg-harvard-light focus:ring-harvard-crimson;
+    @apply bg-white text-accent-primary border-accent-primary hover:bg-gray-50 focus:ring-accent-primary
+           dark:bg-transparent dark:text-accent-secondary dark:border-accent-primary dark:hover:bg-dark-300;
+  }
+  
+  .btn-text {
+    @apply text-accent-primary hover:text-accent-tertiary bg-transparent shadow-none focus:ring-accent-primary
+           dark:text-accent-secondary dark:hover:text-accent-primary;
+  }
+  
+  .btn-icon {
+    @apply p-2 rounded-full;
   }
   
   /* Input styles */
   .input {
-    @apply block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-harvard-crimson focus:border-harvard-crimson sm:text-sm;
+    @apply block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-accent-primary focus:border-accent-primary sm:text-sm
+           dark:bg-dark-300 dark:border-dark-400 dark:text-dark-800 dark:focus:ring-accent-primary dark:focus:border-accent-primary dark:placeholder-dark-500;
+  }
+  
+  .input-search {
+    @apply pl-10;
   }
   
   /* Card styles */
   .card {
-    @apply bg-white shadow-card rounded-xl border border-gray-100 overflow-hidden;
+    @apply bg-white shadow-card rounded-xl border border-gray-100 overflow-hidden
+           dark:bg-dark-200 dark:border-dark-300 dark:shadow-card-dark transition-all duration-300 hover:shadow-hover dark:hover:shadow-hover-dark;
   }
   
   .card-header {
-    @apply px-4 py-5 sm:px-6 border-b border-gray-200;
+    @apply px-4 py-5 sm:px-6 border-b border-gray-200
+           dark:border-dark-400;
   }
   
   .card-body {
@@ -69,7 +111,8 @@
   }
   
   .card-footer {
-    @apply px-4 py-3 bg-gray-50 sm:px-6 border-t border-gray-200;
+    @apply px-4 py-3 bg-gray-50 sm:px-6 border-t border-gray-200
+           dark:bg-dark-300 dark:border-dark-400;
   }
   
   /* Badge styles */
@@ -78,41 +121,65 @@
   }
   
   .badge-primary {
-    @apply bg-harvard-light text-harvard-crimson;
+    @apply bg-accent-primary bg-opacity-10 text-accent-primary
+           dark:bg-opacity-20 dark:bg-accent-primary dark:text-accent-secondary;
   }
   
   .badge-secondary {
-    @apply bg-gray-100 text-gray-800;
+    @apply bg-gray-100 text-gray-800
+           dark:bg-dark-400 dark:text-dark-800;
+  }
+  
+  .badge-success {
+    @apply bg-green-100 text-green-800
+           dark:bg-green-900 dark:bg-opacity-20 dark:text-green-400;
+  }
+  
+  .badge-warning {
+    @apply bg-yellow-100 text-yellow-800
+           dark:bg-yellow-900 dark:bg-opacity-20 dark:text-yellow-400;
+  }
+  
+  .badge-error {
+    @apply bg-red-100 text-red-800
+           dark:bg-red-900 dark:bg-opacity-20 dark:text-red-400;
   }
   
   /* Loader */
   .loader {
-    @apply animate-spin rounded-full border-t-2 border-b-2 border-harvard-crimson h-5 w-5;
+    @apply animate-spin rounded-full border-t-2 border-b-2 border-accent-primary h-5 w-5
+           dark:border-accent-primary;
   }
   
   /* Markdown styling */
   .prose pre {
-    @apply bg-gray-100 p-3 rounded-lg text-sm my-4 overflow-x-auto;
+    @apply bg-gray-100 p-3 rounded-lg text-sm my-4 overflow-x-auto
+           dark:bg-dark-300 dark:text-dark-800;
   }
 
   .prose code {
-    @apply bg-gray-100 px-1.5 py-0.5 rounded text-sm font-medium text-gray-800;
+    @apply bg-gray-100 px-1.5 py-0.5 rounded text-sm font-medium text-gray-800
+           dark:bg-dark-300 dark:text-dark-800;
   }
 
   .prose h1 {
-    @apply text-2xl font-bold mt-6 mb-4 text-gray-900;
+    @apply text-2xl font-bold mt-6 mb-4 text-gray-900
+           dark:text-dark-800;
   }
 
   .prose h2 {
-    @apply text-xl font-bold mt-5 mb-3 text-gray-900;
+    @apply text-xl font-bold mt-5 mb-3 text-gray-900
+           dark:text-dark-800;
   }
 
   .prose h3 {
-    @apply text-lg font-bold mt-4 mb-2 text-gray-900;
+    @apply text-lg font-bold mt-4 mb-2 text-gray-900
+           dark:text-dark-800;
   }
 
   .prose p {
-    @apply my-3 leading-relaxed;
+    @apply my-3 leading-relaxed
+           dark:text-dark-700;
   }
 
   .prose ul {
@@ -124,11 +191,13 @@
   }
 
   .prose a {
-    @apply text-harvard-crimson hover:underline font-medium;
+    @apply text-accent-primary hover:underline font-medium
+           dark:text-accent-primary;
   }
 
   .prose blockquote {
-    @apply border-l-4 border-gray-300 pl-4 italic my-4 text-gray-700;
+    @apply border-l-4 border-gray-300 pl-4 italic my-4 text-gray-700
+           dark:border-dark-400 dark:text-dark-600;
   }
 
   .prose table {
@@ -136,15 +205,57 @@
   }
 
   .prose th {
-    @apply border px-4 py-2 bg-gray-100 font-semibold text-left;
+    @apply border px-4 py-2 bg-gray-100 font-semibold text-left
+           dark:bg-dark-300 dark:border-dark-400;
   }
 
   .prose td {
-    @apply border px-4 py-2;
+    @apply border px-4 py-2
+           dark:border-dark-400;
   }
 
   .prose hr {
-    @apply my-6 border-t border-gray-300;
+    @apply my-6 border-t border-gray-300
+           dark:border-dark-400;
+  }
+  
+  /* Enhanced Message Styling - more professional centered layout */
+  .message-container {
+    @apply flex flex-col max-w-3xl mx-auto w-full;
+  }
+  
+  .message-user {
+    @apply bg-chat-user dark:bg-dark-300 text-gray-900 dark:text-dark-800 shadow-subtle dark:shadow-subtle-dark animate-fade-in border border-chat-border dark:border-dark-400;
+  }
+  
+  .message-assistant {
+    @apply bg-chat-assistant dark:bg-dark-200 text-gray-800 dark:text-dark-700 shadow-subtle dark:shadow-subtle-dark animate-fade-in border border-chat-border dark:border-dark-400;
+  }
+  
+  /* Enhanced Navbar */
+  .navbar {
+    @apply bg-white dark:bg-dark-100 shadow-sm border-b border-gray-200 dark:border-dark-300;
+  }
+  
+  .navbar-link {
+    @apply text-gray-600 dark:text-dark-600 hover:text-gray-900 dark:hover:text-dark-800 transition-colors;
+  }
+  
+  .navbar-link-active {
+    @apply border-accent-primary dark:border-accent-primary text-gray-900 dark:text-dark-800 font-medium;
+  }
+  
+  /* Form components */
+  .form-label {
+    @apply block text-sm font-medium text-gray-700 dark:text-dark-700 mb-1;
+  }
+  
+  .form-error {
+    @apply mt-1 text-sm text-accent-error dark:text-accent-error;
+  }
+  
+  .form-help {
+    @apply mt-1 text-xs text-gray-500 dark:text-dark-600;
   }
   
   /* Transitions */
@@ -177,12 +288,108 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-gray-400 rounded-full;
+    @apply bg-gray-400 dark:bg-dark-500 rounded-full;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-gray-500;
+    @apply bg-gray-500 dark:bg-dark-600;
   }
+  
+  /* Course Cards */
+  .course-card {
+    @apply card hover:border-accent-primary dark:hover:border-accent-primary transition-colors;
+  }
+  
+  .course-rating {
+    @apply inline-flex items-center;
+  }
+  
+  .course-rating-high {
+    @apply text-green-600 dark:text-green-400;
+  }
+  
+  .course-rating-medium {
+    @apply text-yellow-600 dark:text-yellow-400;
+  }
+  
+  .course-rating-low {
+    @apply text-accent-error dark:text-accent-error;
+  }
+  
+  .workload-high {
+    @apply text-accent-error dark:text-accent-error;
+  }
+  
+  .workload-medium {
+    @apply text-yellow-500 dark:text-yellow-400;
+  }
+  
+  .workload-low {
+    @apply text-green-500 dark:text-green-400;
+  }
+  
+  /* Chat welcome message - smaller and more elegant */
+  .welcome-message {
+    @apply text-center text-gray-500 dark:text-dark-600 space-y-3 max-w-lg mx-auto px-4;
+  }
+  
+  .welcome-message h2 {
+    @apply text-lg font-semibold text-gray-700 dark:text-dark-700;
+  }
+  
+  .welcome-message p {
+    @apply text-sm;
+  }
+}
+
+/* Dark mode toggle animation */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 24px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  @apply bg-gray-300 dark:bg-accent-primary;
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  transition: .4s;
+  border-radius: 24px;
+}
+
+.toggle-slider:before {
+  @apply bg-white dark:bg-dark-200;
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  transition: .4s;
+  border-radius: 50%;
+}
+
+input:checked + .toggle-slider {
+  @apply bg-accent-primary;
+}
+
+input:focus + .toggle-slider {
+  @apply ring-2 ring-offset-2 ring-accent-primary dark:ring-accent-primary;
+}
+
+input:checked + .toggle-slider:before {
+  transform: translateX(24px);
 }
 
 /* Animations */
@@ -197,6 +404,12 @@
 
 .animate-shimmer {
   background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.5) 50%, rgba(255,255,255,0) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+.dark .animate-shimmer {
+  background: linear-gradient(90deg, rgba(30,30,30,0) 0%, rgba(60,60,60,0.5) 50%, rgba(30,30,30,0) 100%);
   background-size: 200% 100%;
   animation: shimmer 2s infinite;
 }

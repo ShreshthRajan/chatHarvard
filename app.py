@@ -3,7 +3,7 @@ ChatHarvard - Production Backend Server
 """
 
 from flask import Flask, request, jsonify, session
-from flask_cors import CORS
+
 from flask_session import Session
 import os
 import uuid
@@ -17,6 +17,12 @@ import jwt
 from dotenv import load_dotenv
 import json
 import pandas as pd
+import re
+import PyPDF2
+from io import BytesIO
+
+from flask import Flask, request, jsonify, session, make_response
+
 
 # Import the enhanced modules
 from database import HarvardDatabase
@@ -57,10 +63,6 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
 
 # Initialize session
 Session(app)
-
-# Enable CORS
-CORS(app, supports_credentials=True, origins="*", allow_headers=["Content-Type", "Authorization"])
-
 # Auth Configuration
 ANTHROPIC_CLIENT_ID = os.getenv('ANTHROPIC_CLIENT_ID')
 ANTHROPIC_CLIENT_SECRET = os.getenv('ANTHROPIC_CLIENT_SECRET')
@@ -104,7 +106,6 @@ def token_required(f):
         return f(*args, **kwargs)
     
     return decorated
-
 
 # Initialize database
 def initialize_database():
@@ -504,32 +505,60 @@ def clear_chat():
         logger.error(f"Error clearing chat: {str(e)}")
         return jsonify({'error': 'Could not clear chat history'}), 500
 
-@app.route('/api/auth/set_api_key', methods=['POST'])
+@app.route('/api/auth/set_api_key', methods=['POST', 'OPTIONS'])
 def set_api_key():
-    data = request.get_json()
-    api_key = data.get('api_key')
-    provider = data.get('provider')
+    origin = request.headers.get('Origin', '')
+    
+    def corsify(response):
+        response.headers['Access-Control-Allow-Origin'] = origin if origin == 'http://localhost:3000' else ''
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
+        response.headers['Access-Control-Allow-Methods'] = 'POST,OPTIONS'
+        return response
 
-    if provider not in ['openai', 'anthropic']:
-        return jsonify({'error': 'Invalid provider'}), 400
+    if request.method == 'OPTIONS':
+        return corsify(make_response('', 200))
 
-    user_id = str(uuid.uuid4())
-    session['user_id'] = user_id
-    session['auth_provider'] = provider
+    try:
+        data = request.get_json()
+        if not data:
+            return corsify(jsonify({'error': 'No data provided'})), 400
 
-    # Use user-provided key if given, else use your system key
-    if api_key:
-        session['access_token'] = api_key
-    else:
-        session['access_token'] = os.getenv(f'DEFAULT_{provider.upper()}_API_KEY')
+        api_key = data.get('api_key')
+        provider = data.get('provider')
 
-    token = jwt.encode({
-        'user_id': user_id,
-        'auth_provider': provider,
-        'expires': (datetime.now() + timedelta(days=7)).isoformat()
-    }, JWT_SECRET, algorithm="HS256")
+        if provider not in ['openai', 'anthropic']:
+            return corsify(jsonify({'error': 'Invalid provider'})), 400
 
-    return jsonify({'token': token})
+        user_id = str(uuid.uuid4())
+        session['user_id'] = user_id
+        session['auth_provider'] = provider
+
+        if api_key:
+            if provider == 'openai' and not api_key.startswith('sk-'):
+                return corsify(jsonify({'error': 'Invalid OpenAI API key format'})), 400
+            elif provider == 'anthropic' and not api_key.startswith(('sk-ant-', 'sk-ant-api')):
+                return corsify(jsonify({'error': 'Invalid Anthropic API key format'})), 400
+            session['access_token'] = api_key
+        else:
+            default_key = os.getenv(f'DEFAULT_{provider.upper()}_API_KEY')
+            if not default_key:
+                return corsify(jsonify({'error': f'No default {provider} key available'})), 400
+            session['access_token'] = default_key
+
+        token = jwt.encode({
+            'user_id': user_id,
+            'auth_provider': provider,
+            'expires': (datetime.now() + timedelta(days=7)).isoformat()
+        }, JWT_SECRET, algorithm="HS256")
+
+        os.makedirs(f"user_data/{user_id}", exist_ok=True)
+        return corsify(jsonify({'token': token, 'user_id': user_id}))
+
+    except Exception as e:
+        logger.error(f"Error in set_api_key: {str(e)}")
+        return corsify(jsonify({'error': f'Server error: {str(e)}'})), 500
+
 
 # Concentration data route
 @app.route('/api/concentrations', methods=['GET'])
@@ -546,6 +575,206 @@ def get_concentrations():
         logger.error(f"Error getting concentrations: {str(e)}")
         return jsonify({'error': 'Could not retrieve concentrations'}), 500
 
+
+@app.after_request
+def apply_cors(response):
+    origin = request.headers.get('Origin')
+    if origin == "http://localhost:3000":  # allowlist check
+        response.headers['Access-Control-Allow-Origin'] = origin
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
+        response.headers['Access-Control-Allow-Methods'] = 'GET,POST,OPTIONS,PUT,DELETE'
+    return response
+
+@app.route('/api/auth/validate_key', methods=['POST', 'OPTIONS'])
+def validate_api_key():
+    """
+    Validates an API key without creating a session
+    """
+    # For OPTIONS request, return preflight response
+    if request.method == 'OPTIONS':
+        response = jsonify({'status': 'success'})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'POST,OPTIONS')
+        return response
+    
+    # For POST request, process normally
+    # Add explicit CORS headers
+    response_headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+        'Access-Control-Allow-Methods': 'POST,OPTIONS'
+    }
+    
+    data = request.get_json()
+    api_key = data.get('api_key')
+    provider = data.get('provider')
+    
+    # Log the request for debugging
+    logger.info(f"Validating API key for provider: {provider}")
+
+    if provider not in ['openai', 'anthropic']:
+        logger.warning(f"Invalid provider requested: {provider}")
+        response = jsonify({'valid': False, 'error': 'Invalid provider'}), 400
+        for key, value in response_headers.items():
+            response[0].headers[key] = value
+        return response
+
+    if not api_key:
+        # If no key provided, check if we have a default one
+        default_key = os.getenv(f'DEFAULT_{provider.upper()}_API_KEY')
+        if default_key:
+            logger.info(f"Using default {provider} key")
+            response = jsonify({'valid': True})
+            for key, value in response_headers.items():
+                response.headers[key] = value
+            return response
+        else:
+            logger.warning(f"No API key provided and no default key available for {provider}")
+            response = jsonify({'valid': False, 'error': 'No API key provided and no default key available'}), 400
+            for key, value in response_headers.items():
+                response[0].headers[key] = value
+            return response
+
+    # Simple validation based on format without API calls
+    valid = False
+    error_message = 'Invalid API key format'
+    
+    try:
+        if provider == 'openai':
+            if api_key.startswith('sk-'):
+                valid = True
+                logger.info("OpenAI API key format is valid")
+            else:
+                error_message = 'OpenAI API key should start with sk-'
+                logger.warning("Invalid OpenAI API key format")
+        elif provider == 'anthropic':
+            if api_key.startswith(('sk-ant-', 'sk-ant-api')):
+                valid = True
+                logger.info("Anthropic API key format is valid")
+            else:
+                error_message = 'Anthropic API key should start with sk-ant-'
+                logger.warning("Invalid Anthropic API key format")
+    except Exception as e:
+        logger.error(f"API key validation error: {str(e)}")
+        error_message = 'API key validation failed: ' + str(e)
+        valid = False
+
+    if valid:
+        response = jsonify({'valid': True})
+        for key, value in response_headers.items():
+            response.headers[key] = value
+        return response
+    else:
+        response = jsonify({'valid': False, 'error': error_message}), 400
+        for key, value in response_headers.items():
+            response[0].headers[key] = value
+        return response
+
+@app.route('/api/extract_courses', methods=['POST', 'OPTIONS'])
+@token_required
+def extract_courses_from_pdf():
+    """
+    Extract course codes from a PDF transcript
+    """
+    # For OPTIONS request, return preflight response
+    if request.method == 'OPTIONS':
+        response = jsonify({'status': 'success'})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'POST,OPTIONS')
+        return response
+        
+    if 'pdf' not in request.files:
+        return jsonify({'error': 'No PDF file provided'}), 400
+    
+    pdf_file = request.files['pdf']
+    
+    if pdf_file.filename == '':
+        return jsonify({'error': 'No PDF file selected'}), 400
+    
+    try:
+        # Read PDF content
+        pdf_bytes = pdf_file.read()
+        pdf_file_obj = BytesIO(pdf_bytes)
+        
+        # Parse PDF
+        pdf_reader = PyPDF2.PdfReader(pdf_file_obj)
+        text_content = ""
+        
+        # Extract text from all pages
+        for page_num in range(len(pdf_reader.pages)):
+            page = pdf_reader.pages[page_num]
+            text_content += page.extract_text()
+        
+        # Regular expression to find course codes
+        # This pattern looks for common Harvard course code formats
+        # Adjust as needed based on actual transcript formats
+        course_pattern = r'\b([A-Za-z]{2,4})\s*(\d{1,3}[A-Za-z]{0,2})\b'
+        matches = re.findall(course_pattern, text_content)
+        
+        # Format the matches
+        courses = []
+        for dept, num in matches:
+            course_code = f"{dept.upper()} {num}"
+            courses.append(course_code)
+        
+        # Remove duplicates while preserving order
+        unique_courses = []
+        for course in courses:
+            if course not in unique_courses:
+                unique_courses.append(course)
+        
+        return jsonify({'courses': unique_courses})
+    
+    except Exception as e:
+        logger.error(f"Error extracting courses from PDF: {str(e)}")
+        return jsonify({'error': f'Failed to process PDF: {str(e)}'}), 500
+
+# Add a route to handle shared links
+@app.route('/api/shared/<share_id>', methods=['GET', 'OPTIONS'])
+def get_shared_profile(share_id):
+    """
+    Get a read-only shared profile by its ID
+    """
+    # For OPTIONS request, return preflight response
+    if request.method == 'OPTIONS':
+        response = jsonify({'status': 'success'})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'GET,OPTIONS')
+        return response
+        
+    try:
+        # This is a simplified implementation - in a real app, you would
+        # look up the share_id in a database to get the associated user data
+        # Here we're just returning a mock profile
+        
+        # For now, just validate that share_id is alphanumeric
+        if not re.match(r'^[a-zA-Z0-9]+$', share_id):
+            return jsonify({'error': 'Invalid share ID'}), 400
+            
+        # In a real implementation, you would fetch this data from a database
+        # based on the share_id
+        return jsonify({
+            'isShared': True,
+            'shareId': share_id,
+            'profile': {
+                'concentration': 'Computer Science',
+                'year': 'Junior',
+                'courses_taken': ['CS 50', 'MATH 21A', 'ECON 10A'],
+                'interests': ['Machine Learning', 'Economics'],
+            },
+            'chatHistory': [
+                {"role": "user", "content": "What courses should I take next semester?"},
+                {"role": "assistant", "content": "Based on your profile, I'd recommend considering CS 124, CS 121, or if you're interested in machine learning, CS 181."}
+            ]
+        })
+    except Exception as e:
+        logger.error(f"Error getting shared profile: {str(e)}")
+        return jsonify({'error': 'Failed to retrieve shared profile'}), 500
+
 if __name__ == "__main__":
     # Initialize the database on startup
     initialize_database()
@@ -554,4 +783,4 @@ if __name__ == "__main__":
     os.makedirs("user_data", exist_ok=True)
     
     # Run the app
-    app.run(debug=True)
+    app.run(debug=True, host="0.0.0.0", port=5050)
