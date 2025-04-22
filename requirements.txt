@@ -17,7 +17,6 @@ logging
 nltk
 pandas==2.2.2
 numpy>=1.24.3
-re
 
 # File Parsing
 PyPDF2==3.0.1
@@ -28,6 +27,10 @@ anthropic>=0.5.0
 
 # CSV and File Handling
 json
-
-# Optional: if you're doing PDF parsing with binary stream
 io
+
+# Vector Search and Ranking
+sentence-transformers
+faiss-cpu
+scikit-learn
+rank_bm25
