@@ -585,7 +585,7 @@ def get_concentrations():
 @app.after_request
 def apply_cors(response):
     origin = request.headers.get('Origin')
-    if origin == "http://localhost:3000":  # allowlist check
+    if origin in ["http://localhost:3000", "https://chat-harvard.vercel.app"]:
         response.headers['Access-Control-Allow-Origin'] = origin
         response.headers['Access-Control-Allow-Credentials'] = 'true'
         response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
