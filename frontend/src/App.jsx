@@ -19,8 +19,13 @@ import { ToastProvider } from './context/ToastContext';
 // Styles
 import './index.css';
 
+// Use environment-based API URL
+const API_URL = process.env.NODE_ENV === 'production'
+  ? 'https://your-railway-app-url.railway.app' // Replace with your actual Railway URL
+  : 'http://localhost:5050';
+
 // Configure axios defaults
-axios.defaults.baseURL = 'http://localhost:5050';
+axios.defaults.baseURL = API_URL;
 axios.defaults.withCredentials = true;
 axios.defaults.headers.common['Content-Type'] = 'application/json';
 
