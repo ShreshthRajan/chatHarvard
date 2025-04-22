@@ -23,6 +23,9 @@ from io import BytesIO
 
 from flask import Flask, request, jsonify, session, make_response
 
+from dotenv import load_dotenv
+load_dotenv()
+
 
 # Import the enhanced modules
 from database import HarvardDatabase
