@@ -471,7 +471,13 @@ def send_message():
             
         # Add assistant's response to history
         chat_history.append({"role": "assistant", "content": ai_response})
-        
+        course_code_match = re.search(r'\b([A-Za-z]{2,4})\s*(\d{1,3}[A-Za-z]*)\b', message)
+        if course_code_match:
+            course_code = f"{course_code_match.group(1).upper()} {course_code_match.group(2)}"
+            course = harvard_db.get_course_by_code(course_code)
+            if course:
+                chat_history[-1]['courseData'] = course
+                
         # Save updated history
         with open(history_path, 'w') as f:
             json.dump(chat_history, f)
