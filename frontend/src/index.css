@@ -13,6 +13,8 @@
     -moz-osx-font-smoothing: grayscale;
     @apply bg-gray-50 text-gray-800 dark:bg-dark-100 dark:text-dark-700;
     transition: background-color 0.3s ease, color 0.3s ease;
+    letter-spacing: -0.011em;
+    line-height: 1.6;
   }
 
   code {
@@ -25,7 +27,8 @@
   input[type="number"],
   textarea,
   select {
-    @apply transition-all duration-200 dark:bg-dark-300 dark:border-dark-400 dark:text-dark-700 dark:placeholder-dark-500;
+    @apply transition-all duration-200 bg-white dark:bg-dark-200 border border-gray-200 dark:border-dark-400/50 text-gray-800 dark:text-dark-700 placeholder:text-gray-400 dark:placeholder:text-dark-500;
+    font-weight: 300;
   }
   
   button {
@@ -34,20 +37,25 @@
   
   /* Dark mode scrollbar */
   .dark ::-webkit-scrollbar-track {
-    @apply bg-dark-200;
+    @apply bg-dark-200/50;
   }
 
   .dark ::-webkit-scrollbar-thumb {
-    @apply bg-dark-400;
+    @apply bg-dark-400/50;
   }
 
   .dark ::-webkit-scrollbar-thumb:hover {
-    @apply bg-dark-500;
+    @apply bg-dark-500/70;
   }
   
   /* Base styles for headings */
   h1, h2, h3, h4, h5, h6 {
-    @apply font-medium dark:text-dark-800;
+    @apply font-light text-gray-900 dark:text-dark-800;
+    letter-spacing: -0.021em;
+  }
+  
+  strong, b {
+    @apply font-medium text-gray-900 dark:text-dark-800;
   }
   
   a {
@@ -56,28 +64,29 @@
 }
 
 @layer components {
-  /* Button styles */
+  /* Button styles - refined with more elegant transitions */
   .btn {
-    @apply inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-lg text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all duration-200;
+    @apply inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all duration-200;
+    letter-spacing: -0.01em;
   }
   
   .btn-primary {
-    @apply bg-accent-primary text-white hover:bg-accent-tertiary focus:ring-accent-primary 
-           dark:bg-accent-primary dark:hover:bg-accent-tertiary dark:focus:ring-accent-secondary shadow-md hover:shadow-lg;
+    @apply bg-accent-primary text-white hover:bg-accent-tertiary focus:ring-accent-primary/30 
+           dark:bg-accent-primary dark:hover:bg-accent-tertiary dark:focus:ring-accent-secondary/30 shadow-sm hover:shadow-md;
   }
   
   .btn-secondary {
-    @apply bg-white text-gray-700 border-gray-300 hover:bg-gray-50 focus:ring-accent-primary
-           dark:bg-dark-300 dark:text-dark-700 dark:border-dark-400 dark:hover:bg-dark-400 shadow-subtle dark:shadow-subtle-dark;
+    @apply bg-white text-gray-700 border-gray-200 hover:bg-gray-50 focus:ring-accent-primary/30
+           dark:bg-dark-200 dark:text-dark-700 dark:border-dark-400/50 dark:hover:bg-dark-300 shadow-sm dark:shadow-sm;
   }
   
   .btn-outline {
-    @apply bg-white text-accent-primary border-accent-primary hover:bg-gray-50 focus:ring-accent-primary
-           dark:bg-transparent dark:text-accent-secondary dark:border-accent-primary dark:hover:bg-dark-300;
+    @apply bg-white text-accent-primary border-accent-primary/50 hover:border-accent-primary hover:bg-accent-primary/5 focus:ring-accent-primary/30
+           dark:bg-transparent dark:text-accent-secondary dark:border-accent-primary/50 dark:hover:border-accent-primary dark:hover:bg-accent-primary/10;
   }
   
   .btn-text {
-    @apply text-accent-primary hover:text-accent-tertiary bg-transparent shadow-none focus:ring-accent-primary
+    @apply text-accent-primary hover:text-accent-tertiary bg-transparent shadow-none focus:ring-accent-primary/30
            dark:text-accent-secondary dark:hover:text-accent-primary;
   }
   
@@ -87,8 +96,9 @@
   
   /* Input styles */
   .input {
-    @apply block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-accent-primary focus:border-accent-primary sm:text-sm
-           dark:bg-dark-300 dark:border-dark-400 dark:text-dark-800 dark:focus:ring-accent-primary dark:focus:border-accent-primary dark:placeholder-dark-500;
+    @apply block w-full px-3 py-2 border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-accent-primary/30 focus:border-accent-primary/50 text-sm font-light
+           dark:bg-dark-200 dark:border-dark-400/50 dark:text-dark-700 dark:focus:ring-accent-primary/30 dark:focus:border-accent-primary/50 dark:placeholder-dark-500;
+    letter-spacing: -0.01em;
   }
   
   .input-search {
@@ -97,22 +107,23 @@
   
   /* Card styles */
   .card {
-    @apply bg-white shadow-card rounded-xl border border-gray-100 overflow-hidden
-           dark:bg-dark-200 dark:border-dark-300 dark:shadow-card-dark transition-all duration-300 hover:shadow-hover dark:hover:shadow-hover-dark;
+    @apply bg-white shadow-sm rounded-xl border border-gray-200/80 overflow-hidden
+           dark:bg-dark-200 dark:border-dark-300/50 dark:shadow-sm transition-all duration-300 hover:shadow-md dark:hover:shadow-md;
+    backdrop-filter: blur(8px);
   }
   
   .card-header {
-    @apply px-4 py-5 sm:px-6 border-b border-gray-200
-           dark:border-dark-400;
+    @apply px-5 py-4 border-b border-gray-200/80
+           dark:border-dark-400/30;
   }
   
   .card-body {
-    @apply px-4 py-5 sm:p-6;
+    @apply px-5 py-4;
   }
   
   .card-footer {
-    @apply px-4 py-3 bg-gray-50 sm:px-6 border-t border-gray-200
-           dark:bg-dark-300 dark:border-dark-400;
+    @apply px-5 py-4 bg-gray-50/80 border-t border-gray-200/80
+           dark:bg-dark-300/50 dark:border-dark-400/30;
   }
   
   /* Badge styles */
@@ -121,28 +132,28 @@
   }
   
   .badge-primary {
-    @apply bg-accent-primary bg-opacity-10 text-accent-primary
-           dark:bg-opacity-20 dark:bg-accent-primary dark:text-accent-secondary;
+    @apply bg-accent-primary/10 text-accent-primary
+           dark:bg-accent-primary/20 dark:text-accent-secondary;
   }
   
   .badge-secondary {
-    @apply bg-gray-100 text-gray-800
-           dark:bg-dark-400 dark:text-dark-800;
+    @apply bg-gray-100 text-gray-700
+           dark:bg-dark-400/70 dark:text-dark-800;
   }
   
   .badge-success {
-    @apply bg-green-100 text-green-800
-           dark:bg-green-900 dark:bg-opacity-20 dark:text-green-400;
+    @apply bg-green-100/80 text-green-700
+           dark:bg-green-900/20 dark:text-green-400;
   }
   
   .badge-warning {
-    @apply bg-yellow-100 text-yellow-800
-           dark:bg-yellow-900 dark:bg-opacity-20 dark:text-yellow-400;
+    @apply bg-yellow-100/80 text-yellow-700
+           dark:bg-yellow-900/20 dark:text-yellow-400;
   }
   
   .badge-error {
-    @apply bg-red-100 text-red-800
-           dark:bg-red-900 dark:bg-opacity-20 dark:text-red-400;
+    @apply bg-red-100/80 text-red-700
+           dark:bg-red-900/20 dark:text-red-400;
   }
   
   /* Loader */
@@ -151,30 +162,38 @@
            dark:border-accent-primary;
   }
   
-  /* Markdown styling */
+  /* Markdown styling - refined for better typography */
+  .prose {
+    @apply text-gray-700 dark:text-dark-700 text-base leading-relaxed;
+    max-width: 100%;
+  }
+  
   .prose pre {
-    @apply bg-gray-100 p-3 rounded-lg text-sm my-4 overflow-x-auto
-           dark:bg-dark-300 dark:text-dark-800;
+    @apply bg-gray-50 p-4 rounded-lg text-sm my-5 overflow-x-auto border border-gray-100
+           dark:bg-dark-300/70 dark:border-dark-400/30 dark:text-dark-800;
   }
 
   .prose code {
-    @apply bg-gray-100 px-1.5 py-0.5 rounded text-sm font-medium text-gray-800
-           dark:bg-dark-300 dark:text-dark-800;
+    @apply bg-gray-50 px-1.5 py-0.5 rounded text-sm font-light text-gray-700
+           dark:bg-dark-300/70 dark:text-dark-800;
   }
 
   .prose h1 {
-    @apply text-2xl font-bold mt-6 mb-4 text-gray-900
+    @apply text-2xl font-medium mt-6 mb-4 text-gray-900
            dark:text-dark-800;
+    letter-spacing: -0.021em;
   }
 
   .prose h2 {
-    @apply text-xl font-bold mt-5 mb-3 text-gray-900
+    @apply text-xl font-medium mt-5 mb-3 text-gray-900
            dark:text-dark-800;
+    letter-spacing: -0.021em;
   }
 
   .prose h3 {
-    @apply text-lg font-bold mt-4 mb-2 text-gray-900
+    @apply text-lg font-medium mt-4 mb-2 text-gray-900
            dark:text-dark-800;
+    letter-spacing: -0.021em;
   }
 
   .prose p {
@@ -183,89 +202,90 @@
   }
 
   .prose ul {
-    @apply list-disc pl-6 my-3 space-y-1;
+    @apply list-disc pl-6 my-3 space-y-2;
   }
 
   .prose ol {
-    @apply list-decimal pl-6 my-3 space-y-1;
+    @apply list-decimal pl-6 my-3 space-y-2;
   }
 
   .prose a {
     @apply text-accent-primary hover:underline font-medium
-           dark:text-accent-primary;
+           dark:text-accent-secondary transition-all duration-200;
   }
 
   .prose blockquote {
-    @apply border-l-4 border-gray-300 pl-4 italic my-4 text-gray-700
-           dark:border-dark-400 dark:text-dark-600;
+    @apply border-l-4 border-gray-200 pl-4 italic my-4 text-gray-600
+           dark:border-dark-400/50 dark:text-dark-600;
   }
 
   .prose table {
-    @apply border-collapse my-4 w-full text-sm;
+    @apply border-collapse my-5 w-full text-sm;
   }
 
   .prose th {
-    @apply border px-4 py-2 bg-gray-100 font-semibold text-left
-           dark:bg-dark-300 dark:border-dark-400;
+    @apply border px-4 py-2 bg-gray-50 font-medium text-left text-gray-700
+           dark:bg-dark-300/50 dark:border-dark-400/50 dark:text-dark-800;
   }
 
   .prose td {
-    @apply border px-4 py-2
-           dark:border-dark-400;
+    @apply border px-4 py-2 text-gray-700
+           dark:border-dark-400/30 dark:text-dark-700;
   }
 
   .prose hr {
-    @apply my-6 border-t border-gray-300
-           dark:border-dark-400;
+    @apply my-6 border-t border-gray-200
+           dark:border-dark-400/30;
   }
   
-  /* Enhanced Message Styling - more professional centered layout */
+  /* Elegant message styling inspired by Claude.ai */
   .message-container {
     @apply flex flex-col max-w-3xl mx-auto w-full;
   }
   
   .message-user {
-    @apply bg-chat-user dark:bg-dark-300 text-gray-900 dark:text-dark-800 shadow-subtle dark:shadow-subtle-dark animate-fade-in border border-chat-border dark:border-dark-400;
+    @apply bg-white dark:bg-dark-200/80 text-gray-800 dark:text-dark-700 shadow-sm dark:shadow-sm animate-fade-in border border-gray-200/80 dark:border-dark-400/30 rounded-xl;
+    backdrop-filter: blur(8px);
   }
   
   .message-assistant {
-    @apply bg-chat-assistant dark:bg-dark-200 text-gray-800 dark:text-dark-700 shadow-subtle dark:shadow-subtle-dark animate-fade-in border border-chat-border dark:border-dark-400;
+    @apply bg-transparent text-gray-700 dark:text-dark-700 animate-fade-in rounded-xl;
   }
   
   /* Enhanced Navbar */
   .navbar {
-    @apply bg-white dark:bg-dark-100 shadow-sm border-b border-gray-200 dark:border-dark-300;
+    @apply bg-white/80 dark:bg-dark-100/90 shadow-sm border-b border-gray-200/70 dark:border-dark-300/50 backdrop-blur-md;
   }
   
   .navbar-link {
-    @apply text-gray-600 dark:text-dark-600 hover:text-gray-900 dark:hover:text-dark-800 transition-colors;
+    @apply text-gray-500 dark:text-dark-600 hover:text-gray-900 dark:hover:text-dark-800 transition-colors px-3 py-2 rounded-md text-sm font-light;
   }
   
   .navbar-link-active {
-    @apply border-accent-primary dark:border-accent-primary text-gray-900 dark:text-dark-800 font-medium;
+    @apply text-accent-primary dark:text-accent-secondary font-normal border-b-2 border-accent-primary/70 dark:border-accent-primary/70;
   }
   
   /* Form components */
   .form-label {
-    @apply block text-sm font-medium text-gray-700 dark:text-dark-700 mb-1;
+    @apply block text-sm font-normal text-gray-700 dark:text-dark-700 mb-1;
   }
   
   .form-error {
-    @apply mt-1 text-sm text-accent-error dark:text-accent-error;
+    @apply mt-1 text-sm text-red-500 dark:text-red-400;
   }
   
   .form-help {
     @apply mt-1 text-xs text-gray-500 dark:text-dark-600;
   }
   
-  /* Transitions */
+  /* Fade transitions */
   .fade-enter {
     opacity: 0;
   }
   
   .fade-enter-active {
     opacity: 1;
-    transition: opacity 200ms;
+    transition: opacity 200ms ease-out;
   }
   
   .fade-exit {
@@ -274,13 +294,13 @@
   
   .fade-exit-active {
     opacity: 0;
-    transition: opacity 200ms;
+    transition: opacity 200ms ease-in;
   }
 
-  /* Custom scrollbar */
+  /* Custom scrollbar - refined for elegance */
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 5px;
+    height: 5px;
   }
 
   ::-webkit-scrollbar-track {
@@ -288,61 +308,63 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-gray-400 dark:bg-dark-500 rounded-full;
+    @apply bg-gray-300 dark:bg-dark-500/50 rounded-full;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-gray-500 dark:bg-dark-600;
+    @apply bg-gray-400 dark:bg-dark-500/80;
   }
   
   /* Course Cards */
   .course-card {
-    @apply card hover:border-accent-primary dark:hover:border-accent-primary transition-colors;
+    @apply bg-white/90 dark:bg-dark-200/90 hover:border-accent-primary/70 dark:hover:border-accent-primary/70 transition-all duration-300 rounded-xl border border-gray-200/70 dark:border-dark-300/50 overflow-hidden shadow-sm hover:shadow-md;
+    backdrop-filter: blur(8px);
   }
   
   .course-rating {
-    @apply inline-flex items-center;
+    @apply inline-flex items-center space-x-1;
   }
   
   .course-rating-high {
-    @apply text-green-600 dark:text-green-400;
+    @apply text-green-600 dark:text-green-400 font-normal;
   }
   
   .course-rating-medium {
-    @apply text-yellow-600 dark:text-yellow-400;
+    @apply text-yellow-600 dark:text-yellow-400 font-normal;
   }
   
   .course-rating-low {
-    @apply text-accent-error dark:text-accent-error;
+    @apply text-red-500 dark:text-red-400 font-normal;
   }
   
   .workload-high {
-    @apply text-accent-error dark:text-accent-error;
+    @apply text-red-500 dark:text-red-400 font-normal;
   }
   
   .workload-medium {
-    @apply text-yellow-500 dark:text-yellow-400;
+    @apply text-yellow-500 dark:text-yellow-400 font-normal;
   }
   
   .workload-low {
-    @apply text-green-500 dark:text-green-400;
+    @apply text-green-500 dark:text-green-400 font-normal;
   }
   
-  /* Chat welcome message - smaller and more elegant */
+  /* Welcome message - elegant with proper spacing */
   .welcome-message {
-    @apply text-center text-gray-500 dark:text-dark-600 space-y-3 max-w-lg mx-auto px-4;
+    @apply text-center space-y-4 max-w-lg mx-auto px-4;
   }
   
-  .welcome-message h2 {
-    @apply text-lg font-semibold text-gray-700 dark:text-dark-700;
+  .welcome-message h1 {
+    @apply text-2xl sm:text-3xl font-light text-gray-900 dark:text-dark-800 mb-2;
+    letter-spacing: -0.021em;
   }
   
   .welcome-message p {
-    @apply text-sm;
+    @apply text-base text-gray-600 dark:text-dark-600 font-light;
   }
 }
 
-/* Dark mode toggle animation */
+/* Dark mode toggle animation - refined */
 .toggle-switch {
   position: relative;
   display: inline-block;
@@ -357,14 +379,14 @@
 }
 
 .toggle-slider {
-  @apply bg-gray-300 dark:bg-accent-primary;
+  @apply bg-gray-200 dark:bg-accent-primary/80;
   position: absolute;
   cursor: pointer;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  transition: .4s;
+  transition: .3s ease-in-out;
   border-radius: 24px;
 }
 
@@ -376,23 +398,24 @@
   width: 18px;
   left: 3px;
   bottom: 3px;
-  transition: .4s;
+  transition: .3s ease-in-out;
   border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 input:checked + .toggle-slider {
-  @apply bg-accent-primary;
+  @apply bg-accent-primary/90;
 }
 
 input:focus + .toggle-slider {
-  @apply ring-2 ring-offset-2 ring-accent-primary dark:ring-accent-primary;
+  @apply ring-2 ring-offset-2 ring-accent-primary/30 dark:ring-accent-primary/30;
 }
 
 input:checked + .toggle-slider:before {
   transform: translateX(24px);
 }
 
-/* Animations */
+/* Refined animations */
 @keyframes shimmer {
   0% {
     background-position: -200% 0;
@@ -403,23 +426,21 @@ input:checked + .toggle-slider:before {
 }
 
 .animate-shimmer {
-  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.5) 50%, rgba(255,255,255,0) 100%);
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0) 100%);
   background-size: 200% 100%;
-  animation: shimmer 2s infinite;
+  animation: shimmer 2.5s ease-in-out infinite;
 }
 
 .dark .animate-shimmer {
-  background: linear-gradient(90deg, rgba(30,30,30,0) 0%, rgba(60,60,60,0.5) 50%, rgba(30,30,30,0) 100%);
+  background: linear-gradient(90deg, rgba(30,30,30,0) 0%, rgba(60,60,60,0.3) 50%, rgba(30,30,30,0) 100%);
   background-size: 200% 100%;
-  animation: shimmer 2s infinite;
+  animation: shimmer 2.5s ease-in-out infinite;
 }
 
-/* Add these animation classes to your existing CSS */
-
-/* Animation for the loading dots */
+/* Refined animation for the loading dots */
 @keyframes pulse {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 1; }
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.8; }
 }
 
 .animate-pulse {
@@ -434,82 +455,36 @@ input:checked + .toggle-slider:before {
   animation-delay: 0.4s;
 }
 
-/* Custom styles to enhance textarea behavior */
+/* Elegant fade-in animation */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+/* Enhanced textarea behavior */
 textarea.resize-none {
   resize: none;
   overflow-y: hidden;
-  min-height: 40px;
-  transition: height 0.1s ease;
+  min-height: 48px;
+  transition: height 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* Improve scrollbar for dark mode */
-.dark ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-.dark ::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.dark ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 9999px;
-}
-
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-/* Improve focus states */
+/* Focus states */
 .focus-within\:border-accent-primary:focus-within {
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 1px rgba(139, 108, 92, 0.1);
+  @apply border-accent-primary/50;
+  box-shadow: 0 0 0 2px rgba(179, 50, 69, 0.1);
 }
 
-/* Enhanced user message styling */
-.bg-dark-200 {
-  position: relative;
+.dark .focus-within\:border-accent-primary:focus-within {
+  @apply border-accent-primary/50;
+  box-shadow: 0 0 0 2px rgba(179, 50, 69, 0.15);
 }
 
-/* Add subtle shadow effect */
-.shadow-sm {
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-}
-
-/* Improve welcome message appearance */
-.welcome-message {
-  max-width: 600px;
-  margin: 0 auto;
-}
-
-/* Add styles for suggestions */
-.suggestion-button {
-  transition: all 0.2s ease;
-  border: 1px solid var(--dark-300);
-  background-color: var(--dark-200);
-  color: var(--dark-700);
-  border-radius: 0.75rem;
-  padding: 0.75rem 1rem;
-  text-align: left;
-  margin-bottom: 0.5rem;
-  cursor: pointer;
-}
-
-.suggestion-button:hover {
-  background-color: var(--dark-300);
-}
-
-/* Make sure the textarea auto-grows properly */
-.min-h-10 {
-  min-height: 2.5rem;
-}
-
-.max-h-40 {
-  max-height: 10rem;
-}
-
-/* Styles for chat bubbles */
+/* Message bubble styling */
 .message-bubble {
   max-width: 100%;
   word-wrap: break-word;
@@ -521,122 +496,221 @@ button, a, input, textarea {
   transition: all 0.2s ease;
 }
 
-/* Improved Harvard Theme Colors */
-
+/* Refined Harvard Theme Colors - Claude.ai inspired */
 :root {
-  /* Refined Harvard Colors - More Professional & Readable */
-  --harvard-crimson: #A51C30; /* Original Harvard Crimson for reference */
+  /* Core Harvard Colors - Refined for elegance */
+  --harvard-crimson: #A51C30; /* Original Harvard Crimson */
   --harvard-crimson-refined: #B33245; /* Slightly lighter for better readability */
   --harvard-crimson-light: #D6697A; /* Light version for backgrounds, borders */
-  --harvard-crimson-ultralight: #F5E1E4; /* Very light version for backgrounds */
+  --harvard-crimson-ultralight: #F9E8EA; /* Very light version for backgrounds */
   --harvard-crimson-dark: #8A1729; /* Darker version for hover states */
   
-  /* Neutral Colors */
-  --harvard-gray-dark: #333333;
-  --harvard-gray: #666666;
-  --harvard-gray-medium: #999999;
-  --harvard-gray-light: #CCCCCC;
-  --harvard-gray-ultralight: #F5F5F5;
+  /* Warm-toned Neutral Colors - Claude.ai inspired */
+  --claude-charcoal: #252525;
+  --claude-graphite: #343437;
+  --claude-stone: #49494D;
+  --claude-slate: #64646B;
+  --claude-silver: #9798A1;
+  --claude-cloud: #E6E6EB;
+  --claude-mist: #F5F5F8;
+  --claude-white: #FFFFFF;
   
-  /* UI Colors */
-  --accent-primary: var(--harvard-crimson-refined); /* Main accent color - lighter than original */
-  --accent-secondary: var(--harvard-crimson-light);
-  --accent-tertiary: var(--harvard-crimson-dark);
+  /* UI Colors - Balance of Harvard and Claude.ai */
+  --accent-primary: var(--harvard-crimson-refined);
+  --accent-secondary: #D6697A;
+  --accent-tertiary: #8A1729;
   
-  /* Text on accent colors */
+  /* Text Colors */
+  --text-primary: #1A1A1D;
+  --text-secondary: #49494D;
+  --text-tertiary: #64646B;
   --text-on-accent: #FFFFFF;
   
   /* Background colors */
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F9F9FB;
+  --bg-tertiary: #F5F5F8;
   --accent-bg-light: var(--harvard-crimson-ultralight);
   
-  /* Toast Colors */
-  --toast-success: var(--harvard-crimson-refined);
-  --toast-bg: #FFFFFF;
-  --toast-text: #333333;
-  --toast-border: 1px solid #EEEEEE;
+  /* Feedback Colors */
+  --success: #106A4E;
+  --warning: #B86E00;
+  --error: #B33245;
 }
 
-/* Dark theme overrides */
+/* Dark theme colors - Claude.ai inspired warm dark */
 .dark {
-  --accent-primary: var(--harvard-crimson-refined);
-  --accent-secondary: var(--harvard-crimson-light);
-  --accent-tertiary: var(--harvard-crimson-ultralight);
+  /* UI Colors */
+  --accent-primary: #CB4A5C; /* Brighter in dark mode */
+  --accent-secondary: #D6697A;
+  --accent-tertiary: #F9E8EA;
   
-  --accent-bg-light: rgba(165, 28, 48, 0.15); /* Transparent version for dark mode */
+  /* Text Colors */
+  --text-primary: #E6E6EB;
+  --text-secondary: #BABABF;
+  --text-tertiary: #9798A1;
+  --text-on-accent: #FFFFFF;
   
-  --toast-bg: #2A2A2A;
-  --toast-text: #F0F0F0;
-  --toast-border: 1px solid #444444;
+  /* Background colors */
+  --bg-primary: #1A1A1D;
+  --bg-secondary: #252529;
+  --bg-tertiary: #343437;
+  --accent-bg-light: rgba(179, 50, 69, 0.15);
+  
+  /* Feedback Colors */
+  --success: #3CCF98;
+  --warning: #EDAA4B;
+  --error: #E16975;
 }
 
-/* Button Styles */
+/* Tailwind Dark Mode Color Overrides */
+.dark {
+  --dark-100: #1A1A1D; /* Main background */
+  --dark-200: #252529; /* Card background */
+  --dark-300: #2D2D31; /* Input background */
+  --dark-400: #3F3F43; /* Border colors */
+  --dark-500: #64646B; /* Muted text */
+  --dark-600: #9798A1; /* Secondary text */
+  --dark-700: #CDCDD4; /* Primary text */
+  --dark-800: #E6E6EB; /* Headings */
+  --dark-900: #F5F5F8; /* Emphasized text */
+}
+
+/* Shadow Refinements */
+.shadow-sm {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.shadow-md {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04), 0 3px 6px rgba(0, 0, 0, 0.03);
+}
+
+.shadow-lg {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.04), 0 5px 10px rgba(0, 0, 0, 0.03);
+}
+
+.dark .shadow-sm {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.dark .shadow-md {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2), 0 3px 6px rgba(0, 0, 0, 0.15);
+}
+
+.dark .shadow-lg {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2), 0 5px 10px rgba(0, 0, 0, 0.15);
+}
+
+/* Refined Button Styles */
 .btn-primary {
   background-color: var(--accent-primary);
   color: var(--text-on-accent);
   border: none;
   font-weight: 500;
   padding: 0.5rem 1rem;
-  border-radius: 0.375rem;
+  border-radius: 0.5rem;
   transition: all 0.2s ease;
+  letter-spacing: -0.01em;
 }
 
 .btn-primary:hover {
-  background-color: var(--harvard-crimson-dark);
+  background-color: var(--accent-tertiary);
+  transform: translateY(-1px);
 }
 
-/* Outline button */
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+/* Subtle Outline button */
 .btn-outline {
   background-color: transparent;
   color: var(--accent-primary);
   border: 1px solid var(--accent-primary);
-  font-weight: 500;
+  font-weight: 400;
   padding: 0.5rem 1rem;
-  border-radius: 0.375rem;
+  border-radius: 0.5rem;
   transition: all 0.2s ease;
 }
 
 .btn-outline:hover {
   background-color: var(--accent-bg-light);
+  transform: translateY(-1px);
 }
 
-/* Login screen specific styling */
-.login-card {
-  background-color: rgba(40, 40, 40, 0.7);
-  backdrop-filter: blur(10px);
-  border-radius: 0.75rem;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 5px 15px rgba(0, 0, 0, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+.btn-outline:active {
+  transform: translateY(0);
 }
 
-.login-btn {
-  background-color: var(--accent-primary);
-  color: white;
+/* Ghost button */
+.btn-ghost {
+  background-color: transparent;
+  color: var(--text-tertiary);
   border: none;
-  font-weight: 500;
-  border-radius: 0.375rem;
-  transition: all 0.2s ease;
-  padding: 0.75rem 1rem;
-}
-
-.login-btn:hover {
-  background-color: var(--harvard-crimson-dark);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.provider-btn {
-  background-color: var(--harvard-gray-ultralight);
-  color: var(--harvard-gray-dark);
-  border: 1px solid var(--harvard-gray-light);
+  font-weight: 400;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
   transition: all 0.2s ease;
 }
 
-.provider-btn:hover {
-  background-color: white;
-  border-color: var(--harvard-gray-medium);
+.btn-ghost:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
 }
 
-.provider-btn.selected {
-  background-color: var(--accent-bg-light);
-  color: var(--accent-primary);
-  border-color: var(--accent-primary);
+/* New suggestion button style - more refined */
+.suggestion-button {
+  @apply flex items-center text-left px-4 py-3 border border-gray-200/80 dark:border-dark-400/30 rounded-xl bg-white dark:bg-dark-200/80 hover:border-accent-primary/30 dark:hover:border-accent-primary/30 hover:shadow-sm transition-all duration-200 backdrop-blur-sm;
+  font-weight: 300;
+}
+
+.suggestion-button:hover {
+  @apply bg-white dark:bg-dark-200;
+  transform: translateY(-1px);
+}
+
+/* Chat typography refinements */
+.chat-content {
+  @apply text-gray-700 dark:text-dark-700;
+  font-weight: 300;
+  letter-spacing: -0.011em;
+}
+
+.chat-content strong, 
+.chat-content b {
+  @apply font-medium text-gray-900 dark:text-dark-800;
+}
+
+/* Input focus glow effect */
+textarea:focus, 
+input:focus {
+  box-shadow: 0 0 0 2px rgba(179, 50, 69, 0.1);
+}
+
+.dark textarea:focus,
+.dark input:focus {
+  box-shadow: 0 0 0 2px rgba(179, 50, 69, 0.15);
+}
+
+/* Elegant typing indicator */
+.typing-indicator {
+  @apply flex space-x-1 items-center;
+}
+
+.typing-indicator span {
+  @apply h-1.5 w-1.5 bg-accent-primary/60 dark:bg-accent-primary/60 rounded-full;
+}
+
+/* Course card enhancements */
+.course-card-in-chat {
+  @apply rounded-lg bg-white/95 dark:bg-dark-200/95 transition-all duration-200;
+}
+
+/* Gradient background overlay for bottom input */
+.from-gradient-light {
+  background: linear-gradient(to top, rgba(249, 249, 251, 1) 60%, rgba(249, 249, 251, 0));
+}
+
+.dark .from-gradient-dark {
+  background: linear-gradient(to top, rgba(26, 26, 29, 1) 60%, rgba(26, 26, 29, 0));
 }

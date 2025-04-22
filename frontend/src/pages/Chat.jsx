@@ -368,7 +368,7 @@ const sanitizeForJSON = (obj) => {
           </ReactMarkdown>
           
           {hasEssentialData ? (
-            <div className="border border-harvard-crimson dark:border-accent-primary p-4 my-4 rounded-lg shadow-sm bg-white dark:bg-dark-200">
+            <div className="border border-accent-primary/20 dark:border-accent-primary/30 p-4 my-4 rounded-lg shadow-sm bg-white dark:bg-dark-200">
               <CourseCard 
                 course={normalized} 
                 className="course-card-in-chat"
@@ -379,7 +379,7 @@ const sanitizeForJSON = (obj) => {
                     href={normalized.qReportLink} 
                     target="_blank" 
                     rel="noopener noreferrer" 
-                    className="text-harvard-crimson dark:text-accent-primary hover:underline"
+                    className="text-accent-primary dark:text-accent-secondary hover:underline"
                   >
                     View Q Report
                   </a>
@@ -387,7 +387,7 @@ const sanitizeForJSON = (obj) => {
               )}
             </div>
           ) : (
-            <div className="text-sm text-gray-400 italic mt-2 bg-gray-100 dark:bg-dark-300 p-3 rounded">
+            <div className="text-sm text-gray-400 italic mt-2 bg-gray-50 dark:bg-dark-300/50 p-3 rounded">
               Course card data not available. Try asking for information on a specific course.
             </div>
           )}
@@ -405,14 +405,20 @@ const sanitizeForJSON = (obj) => {
   if (!hasProfile) return null;
 
   return (
-    <div className="font-[Georgia,serif]">
+    <div className="font-sans">
       <Navbar />
       <main className="flex flex-col items-center px-2 sm:px-6 pt-4 pb-36 max-w-4xl mx-auto min-h-screen">
         {messages.length === 0 && !sending ? (
-          <div className="welcome-message text-center mt-20">
-            <div className="text-4xl mb-4">🎓</div>
-            <h1 className="text-2xl font-bold mb-2">Welcome to ChatHarvard</h1>
-            <p className="text-dark-500 mb-6">Ask anything about Harvard courses, requirements, or get recommendations.</p>
+          <div className="welcome-message text-center mt-20 animate-fade-in">
+            <div className="w-16 h-16 bg-accent-primary/10 dark:bg-accent-primary/20 rounded-full flex items-center justify-center mx-auto mb-6">
+              <div className="text-3xl">🎓</div>
+            </div>
+            <h1 className="text-2xl font-light mb-3 text-gray-900 dark:text-dark-800">
+              Welcome to <span className="font-medium text-accent-primary dark:text-accent-secondary">ChatHarvard</span>
+            </h1>
+            <p className="text-gray-600 dark:text-dark-600 mb-8 max-w-md mx-auto">
+              Ask anything about Harvard courses, requirements, or get recommendations.
+            </p>
             <div className="grid gap-3">
               {[
                 "What courses should I take for Computer Science?",
@@ -426,7 +432,7 @@ const sanitizeForJSON = (obj) => {
                     setInput(s);
                     inputRef.current?.focus();
                   }}
-                  className="suggestion-button"
+                  className="text-left px-4 py-3 border border-gray-200 dark:border-dark-400/50 rounded-xl bg-white dark:bg-dark-200 hover:border-accent-primary/40 dark:hover:border-accent-primary/40 hover:bg-accent-primary/5 dark:hover:bg-dark-300 transition-all duration-200"
                 >
                   {s}
                 </button>
@@ -438,30 +444,39 @@ const sanitizeForJSON = (obj) => {
             {messages.map((m, i) => (
               <div
                 key={i}
-                className={`px-5 py-4 rounded-xl ${
+                className={`px-5 py-4 rounded-xl transition-all duration-300 ${
                   m.role === 'user'
-                    ? 'bg-dark-200 text-dark-700 border border-dark-300'
-                    : 'bg-transparent text-dark-600'
+                    ? 'bg-white dark:bg-dark-200 text-gray-800 dark:text-dark-700 border border-gray-200/80 dark:border-dark-400/30 shadow-sm'
+                    : 'bg-transparent text-gray-700 dark:text-dark-700'
                 }`}
               >
-                <div className="text-xs text-dark-500 mb-1 font-medium">
+                <div className="text-xs text-gray-400 dark:text-dark-500 mb-2 font-light">
                   {m.role === 'assistant' ? 'ChatHarvard' : 'You'} • {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>
                 {renderMessageContent(m)}
               </div>
             ))}
-            {sending && <div className="text-sm text-dark-600 animate-pulse">Typing...</div>}
+            {sending && (
+              <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-dark-600">
+                <div className="flex space-x-1">
+                  <span className="h-1.5 w-1.5 bg-accent-primary/60 dark:bg-accent-primary/60 rounded-full animate-pulse"></span>
+                  <span className="h-1.5 w-1.5 bg-accent-primary/60 dark:bg-accent-primary/60 rounded-full animate-pulse delay-200"></span>
+                  <span className="h-1.5 w-1.5 bg-accent-primary/60 dark:bg-accent-primary/60 rounded-full animate-pulse delay-400"></span>
+                </div>
+                <span className="text-xs font-light">ChatHarvard is thinking...</span>
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
         )}
       </main>
 
       {/* Sticky Input Bubble */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center bg-transparent pointer-events-none">
+      <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center bg-gradient-to-t from-gray-50 dark:from-dark-100 to-transparent pointer-events-none pb-4 pt-16">
         <div className="w-full max-w-4xl px-4 py-3 pointer-events-auto">
           <button
             onClick={handleClearChat}
-            className="text-xs mb-2 px-3 py-1.5 border border-dark-300 text-dark-600 hover:text-dark-700 rounded-md hover:bg-dark-200 transition"
+            className="text-xs mb-2 px-3 py-1.5 border border-accent-primary/30 bg-accent-primary/10 text-accent-primary hover:text-accent-tertiary rounded-md hover:bg-accent-primary/20 transition"
           >
             <ArrowPathIcon className="h-4 w-4 inline-block mr-1" />
             New Chat
@@ -473,7 +488,7 @@ const sanitizeForJSON = (obj) => {
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask about Harvard courses..."
               disabled={sending}
-              className="w-full border border-dark-300 rounded-xl p-4 bg-dark-200 text-dark-700 placeholder:text-dark-500 focus:outline-none resize-none min-h-[2.5rem] max-h-[160px]"
+              className="w-full border border-gray-200 dark:border-dark-400/50 rounded-xl p-4 pr-12 bg-white dark:bg-dark-200 text-gray-800 dark:text-dark-700 placeholder:text-gray-400 dark:placeholder:text-dark-500 focus:outline-none focus:ring-2 focus:ring-accent-primary/30 dark:focus:ring-accent-primary/30 focus:border-accent-primary/50 dark:focus:border-accent-primary/50 resize-none min-h-[2.5rem] max-h-[160px] shadow-sm"
               rows={1}
               onInput={(e) => {
                 e.target.style.height = 'auto';
@@ -489,12 +504,14 @@ const sanitizeForJSON = (obj) => {
             <button
               type="submit"
               disabled={sending || !input.trim()}
-              className="absolute right-3 bottom-3 p-2 text-accent-primary hover:bg-dark-300 rounded-lg disabled:opacity-50"
+              className="absolute right-3 bottom-3 p-2 text-accent-primary hover:bg-accent-primary/10 rounded-lg disabled:opacity-50 transition-all duration-200"
             >
               <PaperAirplaneIcon className="h-5 w-5" />
             </button>
           </form>
-          <div className="text-xs text-dark-500 mt-2 text-center">Press Enter to send • Shift+Enter for new line</div>
+          <div className="text-xs text-gray-400 dark:text-dark-500 mt-2 text-center">
+            Press Enter to send • Shift+Enter for new line
+          </div>
         </div>
       </div>
 

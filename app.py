@@ -775,6 +775,27 @@ def get_shared_profile(share_id):
         logger.error(f"Error getting shared profile: {str(e)}")
         return jsonify({'error': 'Failed to retrieve shared profile'}), 500
 
+@app.route('/api/courses/<course_code>', methods=['GET'])
+@token_required
+def get_course_by_code(course_code):
+    # Decode URL-encoded spaces (e.g., MATH%20121 → MATH 121)
+    course_code = course_code.replace('%20', ' ').upper()
+    
+    try:
+        # Initialize DB if needed
+        if harvard_db is None:
+            initialize_database()
+
+        course = harvard_db.get_course_by_code(course_code)
+        if course:
+            return jsonify(course)
+        else:
+            return jsonify({'error': 'Course not found'}), 404
+    except Exception as e:
+        logger.error(f"Error getting course by code: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
 if __name__ == "__main__":
     # Initialize the database on startup
     initialize_database()
@@ -784,3 +805,4 @@ if __name__ == "__main__":
     
     # Run the app
     app.run(debug=True, host="0.0.0.0", port=5050)
+
