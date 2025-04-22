@@ -45,6 +45,7 @@ function Profile() {
         
         const concentrationsResponse = await axios.get('/api/concentrations');
         setConcentrations(concentrationsResponse.data);
+
       } catch (error) {
         console.error('Error fetching profile:', error);
         showToast('Failed to load profile data', 'error');
@@ -224,10 +225,34 @@ function Profile() {
   }
   
   const interestOptions = [
-    "Mathematics", "Computer Science", "Data Science", "Economics", "Business", 
-    "History", "Literature", "Philosophy", "Physics", "Chemistry", "Biology",
-    "Psychology", "Sociology", "Political Science", "International Relations",
-    "Arts", "Music", "Film", "Environmental Studies", "Public Health"
+    "Anthropology",
+    "Art History",
+    "Arts",
+    "Biology",
+    "Business",
+    "Finance",
+    "Chemistry",
+    "Computer Science", 
+    "Data Science",
+    "Education",
+    "Economics",
+    "Environmental Studies",
+    "Film and Visual Studies",
+    "Gender Studies",
+    "Government",
+    "History",
+    "International Relations",
+    "Literature",
+    "Mathematics",
+    "Music",
+    "Neuroscience",
+    "Public Policy",
+    "Philosophy",
+    "Physics",
+    "Psychology",
+    "Public Health",
+    "Sociology",
+    "South Asian Studies"
   ];
   
   const learningOptions = [

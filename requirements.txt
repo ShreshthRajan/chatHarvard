@@ -1,9 +1,33 @@
-# ChatHarvard Dependencies
+# Web and API Framework
+flask
+flask-session
 
+# CORS and Environment
+python-dotenv
+requests
+
+# JWT Auth
+pyjwt
+
+# Logging, Date Handling
+uuid
+logging
+
+# NLP and Data Processing
+nltk
 pandas==2.2.2
-anthropic>=0.5.0
 numpy>=1.24.3
-chromadb==0.4.18
+re
+
+# File Parsing
 PyPDF2==3.0.1
 
+# AI Clients
+openai
+anthropic>=0.5.0
 
+# CSV and File Handling
+json
+
+# Optional: if you're doing PDF parsing with binary stream
+io
