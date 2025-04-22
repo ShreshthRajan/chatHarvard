@@ -3,10 +3,45 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { PaperAirplaneIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import Navbar from '../components/Navbar';
+import { PaperAirplaneIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import { CourseComparisonModal } from '../components/CourseComparisonModal';
 import CourseCard from '../components/CourseCard';
+
+/**
+ * Safely converts an object with NaN values to a JSON-serializable object
+ * @param {Object} obj - The object to sanitize
+ * @returns {Object} - A new object with all NaN values replaced with null
+ */
+const sanitizeForJSON = (obj) => {
+  // Handle null, undefined, or primitive values
+  if (obj === null || obj === undefined) return null;
+  if (typeof obj !== 'object') {
+    // Handle NaN special case for numbers
+    return Number.isNaN(obj) ? null : obj;
+  }
+  
+  // Handle arrays
+  if (Array.isArray(obj)) {
+    return obj.map(item => sanitizeForJSON(item));
+  }
+  
+  // Handle objects
+  const result = {};
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      const value = obj[key];
+      if (value !== value) { // This is how you check for NaN in JavaScript
+        result[key] = null;
+      } else if (typeof value === 'object') {
+        result[key] = sanitizeForJSON(value);
+      } else {
+        result[key] = value;
+      }
+    }
+  }
+  return result;
+};
 
 function Chat() {
   const navigate = useNavigate();
@@ -19,368 +54,456 @@ function Chat() {
   const [coursesToCompare, setCoursesToCompare] = useState([]);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
-  
-  // Fetch chat history and profile
+
   useEffect(() => {
     const fetchData = async () => {
       try {
         const token = localStorage.getItem('token');
-        if (!token) {
-          navigate('/login');
-          return;
-        }
-  
+        if (!token) return navigate('/login');
         axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-  
-        // Get chat history
-        const historyResponse = await axios.get('/api/chat/history');
-        setMessages(historyResponse.data);
-  
-        // Check if profile exists
-        const profileResponse = await axios.get('/api/profile');
-        const profile = profileResponse.data;
-  
-        const hasRequiredInfo =
-          profile.concentration &&
-          profile.year &&
-          profile.courses_taken &&
-          profile.courses_taken.length > 0;
-  
-        setHasProfile(hasRequiredInfo);
-  
-        if (!hasRequiredInfo) {
-          navigate('/profile');
-        }
-      } catch (error) {
-        console.error('Error fetching data:', error);
-        navigate('/login'); // fallback to login on any error
+        const [historyRes, profileRes] = await Promise.all([
+          axios.get('/api/chat/history'),
+          axios.get('/api/profile')
+        ]);
+        setMessages(historyRes.data);
+        const profile = profileRes.data;
+        const hasInfo = profile.concentration && profile.year && profile.courses_taken?.length > 0;
+        setHasProfile(hasInfo);
+        if (!hasInfo) navigate('/profile');
+      } catch (err) {
+        console.error(err);
+        navigate('/login');
       } finally {
         setLoading(false);
       }
     };
-  
     fetchData();
-  }, [navigate]);  
-  
-  // Scroll to bottom when messages change
+  }, [navigate]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-  
-  // Add welcome message if no messages
-  useEffect(() => {
-    if (!loading && messages.length === 0 && hasProfile) {
-      setMessages([
-        {
-          role: 'assistant',
-          content: `👋 Hi there! I'm your Harvard academic advisor.
-          
-I can help you with:
-- Course recommendations based on your interests and profile
-- Information about specific courses and their workload
-- Concentration requirements
-- Comparing different courses
-- And much more!
 
-Ask me anything about Harvard academics or try one of these examples:
-- "I need a 130s level math class for my concentration. What are my options?"
-- "What's the easiest way to fulfill my science requirement?"
-- "Compare the workload between CS50 and CS51"`
-        }
-      ]);
-    }
-  }, [loading, messages.length, hasProfile]);
-  
-  // Function to check if the message is a course information request
-  const isCourseInfoRequest = (content) => {
-    // Check if content contains a course code pattern
-    const courseCodePattern = /([A-Za-z]{2,4})\s*(\d{1,3}[A-Za-z]*)/i;
-    return courseCodePattern.test(content) && 
-           !content.toLowerCase().includes('compare') &&
-           (content.toLowerCase().includes('what is') || 
-            content.toLowerCase().includes('tell me about') || 
-            content.toLowerCase().includes('course information') ||
-            content.toLowerCase().includes('info on') ||
-            content.toLowerCase().includes('details about'));
-  };
-  
-  // Function to extract course code from message
-  const extractCourseCode = (content) => {
-    const match = content.match(/([A-Za-z]{2,4})\s*(\d{1,3}[A-Za-z]*)/i);
-    if (match) {
-      return `${match[1].toUpperCase()} ${match[2]}`;
-    }
-    return null;
-  };
-  
-  // Generate mock course data
-  const generateCourseData = (courseCode) => {
-    const mockCourseData = {
-      code: courseCode,
-      title: `${courseCode} - Sample Course Title`,
-      description: "This is a sample course description that would typically provide an overview of the course content, objectives, and learning outcomes. This description helps students understand what to expect from the course.",
-      instructor: "Professor Sample",
-      term: "Spring 2025",
-      rating: 4.2,
-      workload: 8,
-      prerequisites: ["MATH 1A", "CS 50"],
-      enrollment: 120,
-      tags: ["Quantitative Reasoning", "Departmental Requirement"]
-    };
+  const isCourseInfoRequest = (text) => {
+    const coursePattern = /([A-Za-z]{2,4})\s*(\d{1,3}[A-Za-z]*)/i;
+    const lowerText = text.toLowerCase();
     
-    return mockCourseData;
+    // Return true if the text contains a course code and either:
+    // 1. Contains one of the specific request phrases OR
+    // 2. Contains "course" and one of these related terms: "card", "info", "details", "information"
+    return coursePattern.test(text) &&
+      !lowerText.includes('compare') &&
+      (
+        /(what is|tell me about|info on|details about|course information|show me|display)/i.test(text) ||
+        (
+          lowerText.includes('course') && 
+          /(card|info|details|information|description|overview)/i.test(lowerText)
+        )
+      );
   };
+
+  const extractCourseCode = (text) => {
+    const match = text.match(/([A-Za-z]{2,4})\s*(\d{1,3}[A-Za-z]*)/i);
+    return match ? `${match[1].toUpperCase()} ${match[2]}` : null;
+  };
+
+    // Helper function to replace NaN values with null for JSON serialization
+  // Helper function to replace NaN values with null for JSON serialization
+const sanitizeForJSON = (obj) => {
+  if (obj === null || obj === undefined) return null;
   
+  // Handle NaN specifically
+  if (typeof obj === 'number' && isNaN(obj)) return null;
+  
+  if (typeof obj !== 'object') return obj;
+  
+  // If it's an array, process each element
+  if (Array.isArray(obj)) {
+    return obj.map(item => sanitizeForJSON(item));
+  }
+  
+  // Process object properties
+  const result = {};
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      const value = obj[key];
+      
+      // Check specifically for NaN
+      if (typeof value === 'number' && isNaN(value)) {
+        result[key] = null;
+      } else if (typeof value === 'object') {
+        result[key] = sanitizeForJSON(value);
+      } else {
+        result[key] = value;
+      }
+    }
+  }
+  return result;
+};
+
+  // This is the updated part of your handleSubmit function that handles course data
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
     if (!input.trim() || sending) return;
-    
     const userMessage = input.trim();
     setInput('');
-    
-    // Add user message immediately
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
     setSending(true);
-    
+
     try {
-      const response = await axios.post('/api/chat/message', { message: userMessage });
+      // Check if this is a course info request
+      let courseData = null;
+      const isCourseReq = isCourseInfoRequest(userMessage);
+      console.log("Is this a course request?", isCourseReq);
       
-      let updatedResponse = response.data.history;
-      
-      // Check if response contains course comparison request
-      if (userMessage.toLowerCase().includes('compare')) {
-        const courseCodes = userMessage.match(/([A-Za-z]{2,4})\s*(\d{1,3}[A-Za-z]*)/g);
-        if (courseCodes && courseCodes.length >= 2) {
-          // Mock course data - in a real app, you'd fetch from your backend
-          setCoursesToCompare([
-            {
-              courseCode: courseCodes[0],
-              title: `Sample Course ${courseCodes[0]}`,
-              instructor: "Professor Smith",
-              qScore: 4.2,
-              workload: 8,
-              description: "This is a sample course description for comparison purposes."
-            },
-            {
-              courseCode: courseCodes[1],
-              title: `Sample Course ${courseCodes[1]}`,
-              instructor: "Professor Johnson",
-              qScore: 3.8,
-              workload: 12,
-              description: "This is another sample course description for comparison purposes."
-            }
-          ]);
-          
-          // Wait for state update then open modal
-          setTimeout(() => {
-            setCompareModalOpen(true);
-          }, 500);
+      if (isCourseReq) {
+        const code = extractCourseCode(userMessage);
+        console.log("Extracted course code:", code);
+        
+        if (code) {
+          try {
+            console.log("Fetching course data for:", code);
+            const courseRes = await axios.get(`/api/courses/${code}`);
+            
+            // IMPORTANT: Sanitize the course data to replace NaN with null
+            courseData = sanitizeForJSON(courseRes.data);
+            console.log("Sanitized course data:", courseData);
+          } catch (err) {
+            console.error('Failed to fetch course data:', err);
+          }
         }
+      }
+
+      // Get the AI response
+      const response = await axios.post('/api/chat/message', { message: userMessage });
+      let updated = response.data.history;
+
+      // Handle comparison request
+      if (userMessage.toLowerCase().includes('compare')) {
+        // Your existing comparison logic...
       } 
-      // Check if this is a specific course information request
-      else if (isCourseInfoRequest(userMessage)) {
-        const courseCode = extractCourseCode(userMessage);
-        if (courseCode) {
-          // For course info requests, add a special type to render as a card
-          const lastMessage = updatedResponse[updatedResponse.length - 1];
-          const courseData = generateCourseData(courseCode);
+      // If we have course data, add it to the assistant's message
+      else if (courseData) {
+        const lastAssistantMsgIndex = [...updated].reverse().findIndex(msg => msg.role === 'assistant');
+        if (lastAssistantMsgIndex !== -1) {
+          const trueIndex = updated.length - 1 - lastAssistantMsgIndex;
+          console.log("Adding course data to assistant message at index:", trueIndex);
           
-          // Add a courseData property to the message
-          updatedResponse[updatedResponse.length - 1] = {
-            ...lastMessage,
-            courseData
+          // Ensure the course data is properly sanitized
+          updated[trueIndex] = {
+            ...updated[trueIndex],
+            courseData: courseData, // Already sanitized
           };
         }
       }
-      
-      setMessages(updatedResponse);
-    } catch (error) {
-      console.error('Error sending message:', error);
-      // Add error message
-      setMessages(prev => [
-        ...prev, 
-        { 
-          role: 'assistant', 
-          content: 'Sorry, I encountered an error processing your request. Please try again.' 
-        }
-      ]);
+
+      setMessages(updated);
+    } catch (err) {
+      console.error(err);
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: 'Sorry, I ran into an error. Try again!' 
+      }]);
     } finally {
       setSending(false);
-      // Focus the input field after sending
       inputRef.current?.focus();
     }
   };
-  
+
   const handleClearChat = async () => {
     try {
       await axios.post('/api/chat/clear');
       setMessages([]);
-    } catch (error) {
-      console.error('Error clearing chat:', error);
+    } catch (err) {
+      console.error(err);
     }
   };
-  
-  // Function to render course card when appropriate
+
+  const normalizeCourseData = (data) => {
+    console.log("Original course data type:", typeof data);
+    
+    if (!data) {
+      console.error("No course data provided");
+      return {};
+    }
+    
+    // Convert the data to a usable object
+    let courseData = data;
+    
+    // If it's a string, we need to parse it, but we need to handle NaN values
+    if (typeof data === 'string') {
+      try {
+        // Replace NaN in the string with null before parsing
+        const cleanedString = data
+          .replace(/:\s*NaN/g, ': null')
+          .replace(/:\s*"NaN"/g, ': null');
+        
+        console.log("Cleaned JSON string:", cleanedString);
+        courseData = JSON.parse(cleanedString);
+      } catch (e) {
+        console.error("Failed to parse course data string:", e);
+        // Try a different approach
+        try {
+          // Try to evaluate the object directly (careful with this approach)
+          // This is needed because JSON.parse doesn't accept NaN
+          courseData = eval(`(${data})`);
+          // Immediately sanitize to replace any NaN values
+          courseData = sanitizeForJSON(courseData);
+        } catch (e2) {
+          console.error("Failed second parsing attempt:", e2);
+          return {}; // Give up and return empty object
+        }
+      }
+    }
+    
+    console.log("Processed course data:", courseData);
+    
+    // Extract basic fields with safety checks
+    const safeString = (field) => {
+      const val = courseData[field];
+      if (val === null || val === undefined || Number.isNaN(val)) return '';
+      return String(val).trim();
+    };
+    
+    const safeNumber = (field) => {
+      const val = courseData[field];
+      if (val === null || val === undefined || Number.isNaN(val)) return null;
+      const num = parseFloat(val);
+      return isNaN(num) ? null : num;
+    };
+    
+    const parseJsonArray = (field) => {
+      try {
+        const val = courseData[field];
+        if (!val) return [];
+        
+        // Already an array
+        if (Array.isArray(val)) return val;
+        
+        // String that needs parsing
+        if (typeof val === 'string') {
+          return JSON.parse(val);
+        }
+        
+        return [];
+      } catch (e) {
+        console.warn(`Failed to parse ${field} as array:`, e);
+        return [];
+      }
+    };
+    
+    // Extract core fields
+    const code = safeString('class_tag');
+    const title = safeString('class_name');
+    const description = safeString('description');
+    const instructors = parseJsonArray('instructors');
+    const instructorStr = Array.isArray(instructors) ? instructors.join(', ') : '';
+    const days = parseJsonArray('days');
+    const daysStr = Array.isArray(days) ? days.join(', ') : '';
+    
+    // Build the normalized course object
+    const normalized = {
+      code: code,
+      title: title,
+      description: description,
+      instructor: instructorStr, 
+      term: safeString('term'),
+      rating: safeNumber('overall_score_course_mean'),
+      workload: safeNumber('mean_hours'),
+      prerequisites: [],
+      enrollment: safeNumber('current_enrollment_number'),
+      tags: [],
+      schedule: daysStr,
+      qReportLink: safeString('q_report'),
+      units: safeString('units')
+    };
+    
+    // Add prerequisites
+    if (courseData.recommended_prep) {
+      normalized.prerequisites.push(courseData.recommended_prep);
+    }
+    
+    if (courseData.course_requirements) {
+      normalized.prerequisites.push(courseData.course_requirements);
+    }
+    
+    // Add basic tags
+    if (courseData.department) {
+      normalized.tags.push(courseData.department);
+    }
+    
+    console.log("Normalized course data:", normalized);
+    
+    // Log warning if essential fields are missing
+    if (!normalized.code || !normalized.title) {
+      console.warn('⚠️ Missing key course fields:', normalized);
+    }
+    
+    return normalized;
+  };  
+
   const renderMessageContent = (message) => {
     if (message.role === 'assistant' && message.courseData) {
-      return (
-        <div className="mb-4">
-          <div className="prose prose-sm max-w-none dark:prose-dark mb-4">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {message.content}
-            </ReactMarkdown>
-          </div>
-          <div className="mt-4 bg-white dark:bg-dark-300 rounded-lg shadow-sm overflow-hidden border border-gray-200 dark:border-dark-400">
-            <CourseCard course={message.courseData} />
-          </div>
-        </div>
+      console.log("Found message with courseData:", 
+        typeof message.courseData === 'string' 
+          ? message.courseData.substring(0, 50) + '...' 
+          : message.courseData
       );
-    } else if (message.role === 'assistant') {
+      
+      // Normalize the course data
+      const normalized = normalizeCourseData(message.courseData);
+      
+      // Only render the CourseCard if we have the minimum essential data
+      const hasEssentialData = normalized && normalized.code && normalized.title;
+      console.log("Has essential data:", hasEssentialData);
+      
+      if (!hasEssentialData) {
+        console.warn("Missing essential course data for rendering card");
+      }
+      
       return (
-        <div className="prose prose-sm max-w-none dark:prose-dark">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+        <>
+          <ReactMarkdown remarkPlugins={[remarkGfm]} className="prose dark:prose-dark mb-3">
             {message.content}
           </ReactMarkdown>
-        </div>
-      );
-    } else {
-      return (
-        <p className="whitespace-pre-wrap">{message.content}</p>
-      );
-    }
-  };
-  
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-dark-100 flex justify-center items-center transition-colors">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-accent-primary"></div>
-      </div>
-    );
-  }
-  
-  if (!hasProfile) {
-    return null; // Will redirect to profile page
-  }
-  
-  return (
-    <>
-      <Navbar />
-      <div className="flex flex-col h-screen bg-gray-50 dark:bg-dark-100 transition-colors">
-        {/* Chat container */}
-        <div className="flex-1 overflow-hidden flex flex-col">
-          {/* Messages container with Claude.ai-like styling */}
-          <div className="flex-1 overflow-y-auto px-4 md:px-6 max-w-4xl mx-auto w-full">
-            {messages.length === 0 && !sending && (
-              <div className="flex flex-col items-center justify-center h-full welcome-message">
-                <div className="text-4xl mb-2">🎓</div>
-                <h2>Welcome to ChatHarvard</h2>
-                <p>Your personal academic advisor for Harvard University. Ask me anything about courses, requirements, or get personalized recommendations.</p>
-              </div>
-            )}
-            
-            <div className="message-container space-y-1 py-6">
-              {messages.map((message, index) => (
-                <div
-                  key={index}
-                  className="animate-fade-in mb-6"
-                >
-                  <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-dark-500 mb-1">
-                    <span className="font-medium">
-                      {message.role === 'assistant' ? 'ChatHarvard' : 'You'}
-                    </span>
-                    <span className="text-gray-400 dark:text-dark-600">•</span>
-                    <span className="text-gray-400 dark:text-dark-600">{new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                  </div>
-                  <div 
-                    className={`py-2 ${
-                      message.role === 'user' 
-                        ? 'pl-3 border-l-2 border-gray-300 dark:border-dark-500' 
-                        : ''
-                    }`}
+          
+          {hasEssentialData ? (
+            <div className="border border-harvard-crimson dark:border-accent-primary p-4 my-4 rounded-lg shadow-sm bg-white dark:bg-dark-200">
+              <CourseCard 
+                course={normalized} 
+                className="course-card-in-chat"
+              />
+              {normalized.qReportLink && (
+                <div className="text-xs text-gray-500 mt-2 text-right">
+                  <a 
+                    href={normalized.qReportLink} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="text-harvard-crimson dark:text-accent-primary hover:underline"
                   >
-                    {renderMessageContent(message)}
-                  </div>
-                </div>
-              ))}
-              
-              {/* Enhanced loading indicator */}
-              {sending && (
-                <div className="animate-fade-in mb-6">
-                  <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-dark-500 mb-1">
-                    <span className="font-medium">ChatHarvard</span>
-                    <span className="text-gray-400 dark:text-dark-600">•</span>
-                    <span className="text-gray-400 dark:text-dark-600">{new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                  </div>
-                  <div className="py-2">
-                    <div className="flex items-center space-x-3">
-                      <div className="h-2 w-2 rounded-full bg-accent-primary animate-pulse"></div>
-                      <div className="h-2 w-2 rounded-full bg-accent-primary animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                      <div className="h-2 w-2 rounded-full bg-accent-primary animate-pulse" style={{ animationDelay: '0.4s' }}></div>
-                    </div>
-                  </div>
+                    View Q Report
+                  </a>
                 </div>
               )}
             </div>
-            <div ref={messagesEndRef} />
-          </div>
-          
-          {/* Input container - fixed at bottom with Claude.ai-like styling */}
-          <div className="border-t border-gray-200 dark:border-dark-400 bg-white dark:bg-dark-200 py-4 px-4 md:px-6 transition-colors">
-            <div className="max-w-4xl mx-auto">
-              <div className="flex items-center justify-between mb-3">
+          ) : (
+            <div className="text-sm text-gray-400 italic mt-2 bg-gray-100 dark:bg-dark-300 p-3 rounded">
+              Course card data not available. Try asking for information on a specific course.
+            </div>
+          )}
+        </>
+      );
+    }
+    
+    return (
+      <ReactMarkdown remarkPlugins={[remarkGfm]} className="prose dark:prose-dark">
+        {message.content}
+      </ReactMarkdown>
+    );
+  };
+
+  if (!hasProfile) return null;
+
+  return (
+    <div className="font-[Georgia,serif]">
+      <Navbar />
+      <main className="flex flex-col items-center px-2 sm:px-6 pt-4 pb-36 max-w-4xl mx-auto min-h-screen">
+        {messages.length === 0 && !sending ? (
+          <div className="welcome-message text-center mt-20">
+            <div className="text-4xl mb-4">🎓</div>
+            <h1 className="text-2xl font-bold mb-2">Welcome to ChatHarvard</h1>
+            <p className="text-dark-500 mb-6">Ask anything about Harvard courses, requirements, or get recommendations.</p>
+            <div className="grid gap-3">
+              {[
+                "What courses should I take for Computer Science?",
+                "How do I fulfill the Quantitative Reasoning requirement?",
+                "Compare CS50 and CS51 workload",
+                "What are the prerequisites for ECON 1010?"
+              ].map((s, i) => (
                 <button
-                  onClick={handleClearChat}
-                  className="flex items-center text-xs text-gray-500 dark:text-dark-600 hover:text-gray-700 dark:hover:text-dark-700 px-3 py-1 rounded-md border border-gray-200 dark:border-dark-400 hover:bg-gray-50 dark:hover:bg-dark-300 transition-colors duration-150"
-                >
-                  <ArrowPathIcon className="h-3 w-3 mr-1" />
-                  Clear Chat
-                </button>
-              </div>
-              
-              <form onSubmit={handleSubmit} className="relative">
-                <input
-                  type="text"
-                  ref={inputRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  disabled={sending}
-                  placeholder="Ask about Harvard courses, requirements, or get recommendations..."
-                  className="w-full border border-gray-300 dark:border-dark-400 rounded-lg px-6 py-3 pr-16 shadow-sm focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-transparent dark:bg-dark-300 dark:text-dark-700 dark:placeholder-dark-500 transition-all duration-200"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSubmit(e);
-                    }
+                  key={i}
+                  onClick={() => {
+                    setInput(s);
+                    inputRef.current?.focus();
                   }}
-                />
-                <button
-                  type="submit"
-                  disabled={sending || !input.trim()}
-                  className={`absolute right-2 top-1/2 transform -translate-y-1/2 p-2.5 rounded-lg ${
-                    sending || !input.trim()
-                      ? 'bg-gray-300 dark:bg-dark-400 text-gray-500 dark:text-dark-500 cursor-not-allowed'
-                      : 'bg-accent-primary text-white hover:bg-accent-tertiary'
-                  } transition-colors shadow-sm`}
+                  className="suggestion-button"
                 >
-                  <PaperAirplaneIcon className="h-5 w-5" />
+                  {s}
                 </button>
-                <div className="text-xs text-gray-400 dark:text-dark-500 text-center mt-2">
-                  Press Enter to send • Shift+Enter for new line
-                </div>
-              </form>
+              ))}
             </div>
           </div>
+        ) : (
+          <div className="w-full space-y-5">
+            {messages.map((m, i) => (
+              <div
+                key={i}
+                className={`px-5 py-4 rounded-xl ${
+                  m.role === 'user'
+                    ? 'bg-dark-200 text-dark-700 border border-dark-300'
+                    : 'bg-transparent text-dark-600'
+                }`}
+              >
+                <div className="text-xs text-dark-500 mb-1 font-medium">
+                  {m.role === 'assistant' ? 'ChatHarvard' : 'You'} • {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
+                {renderMessageContent(m)}
+              </div>
+            ))}
+            {sending && <div className="text-sm text-dark-600 animate-pulse">Typing...</div>}
+            <div ref={messagesEndRef} />
+          </div>
+        )}
+      </main>
+
+      {/* Sticky Input Bubble */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center bg-transparent pointer-events-none">
+        <div className="w-full max-w-4xl px-4 py-3 pointer-events-auto">
+          <button
+            onClick={handleClearChat}
+            className="text-xs mb-2 px-3 py-1.5 border border-dark-300 text-dark-600 hover:text-dark-700 rounded-md hover:bg-dark-200 transition"
+          >
+            <ArrowPathIcon className="h-4 w-4 inline-block mr-1" />
+            New Chat
+          </button>
+          <form onSubmit={handleSubmit} className="relative">
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Ask about Harvard courses..."
+              disabled={sending}
+              className="w-full border border-dark-300 rounded-xl p-4 bg-dark-200 text-dark-700 placeholder:text-dark-500 focus:outline-none resize-none min-h-[2.5rem] max-h-[160px]"
+              rows={1}
+              onInput={(e) => {
+                e.target.style.height = 'auto';
+                e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSubmit(e);
+                }
+              }}
+            />
+            <button
+              type="submit"
+              disabled={sending || !input.trim()}
+              className="absolute right-3 bottom-3 p-2 text-accent-primary hover:bg-dark-300 rounded-lg disabled:opacity-50"
+            >
+              <PaperAirplaneIcon className="h-5 w-5" />
+            </button>
+          </form>
+          <div className="text-xs text-dark-500 mt-2 text-center">Press Enter to send • Shift+Enter for new line</div>
         </div>
       </div>
-      
-      {/* Course Comparison Modal */}
-      <CourseComparisonModal 
-        isOpen={compareModalOpen} 
-        onClose={() => setCompareModalOpen(false)} 
-        courses={coursesToCompare} 
+
+      <CourseComparisonModal
+        isOpen={compareModalOpen}
+        onClose={() => setCompareModalOpen(false)}
+        courses={coursesToCompare}
       />
-    </>
+    </div>
   );
 }
 

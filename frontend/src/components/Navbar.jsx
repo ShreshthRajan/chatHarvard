@@ -20,8 +20,8 @@ function Navbar() {
   };
   
   const navigation = [
-    { name: 'Chat', href: '/', current: location.pathname === '/' },
     { name: 'Profile', href: '/profile', current: location.pathname === '/profile' },
+    { name: 'Chat', href: '/', current: location.pathname === '/' },
   ];
 
   return (
