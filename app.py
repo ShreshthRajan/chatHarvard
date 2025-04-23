@@ -22,6 +22,8 @@ import PyPDF2
 from io import BytesIO
 
 from flask import Flask, request, jsonify, session, make_response
+import math
+
 
 
 # Import the enhanced modules
@@ -36,6 +38,8 @@ load_dotenv()
 
 # Configuration
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+
+
 
 # File paths
 SUBJECTS_FILE = "subjects_rows.csv"
@@ -54,6 +58,20 @@ logging.basicConfig(
 )
 logger = logging.getLogger("ChatHarvard")
 
+
+# Add this after the imports
+def sanitize_nan_values(obj):
+    """Recursively sanitize NaN values in dictionaries and lists."""
+    if isinstance(obj, dict):
+        return {k: sanitize_nan_values(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [sanitize_nan_values(item) for item in obj]
+    elif isinstance(obj, float) and math.isnan(obj):
+        return None
+    else:
+        return obj
+    
+    
 # Initialize Flask app
 app = Flask(__name__, static_folder='frontend/build', static_url_path='')
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev_secret_key')
@@ -339,6 +357,11 @@ def get_chat_history():
         logger.error(f"Error getting chat history: {str(e)}")
         return jsonify({'error': 'Could not retrieve chat history'}), 500
 
+"""
+This function needs to be updated in your Flask backend (app.py).
+Replace the existing send_message route with this improved version that handles course data serialization better.
+"""
+
 @app.route('/api/chat/message', methods=['POST'])
 @token_required
 def send_message():
@@ -470,30 +493,46 @@ def send_message():
             ai_response = "Error: Unable to generate response due to authentication issue."
             
         # Add assistant's response to history
-        chat_history.append({"role": "assistant", "content": ai_response})
+        assistant_msg = {"role": "assistant", "content": ai_response}
+        
+        # Add course data if relevant
         course_code_match = re.search(r'\b([A-Za-z]{2,4})\s*(\d{1,3}[A-Za-z]*)\b', message)
         if course_code_match:
             course_code = f"{course_code_match.group(1).upper()} {course_code_match.group(2)}"
             course = harvard_db.get_course_by_code(course_code)
             if course:
-                chat_history[-1]['courseData'] = course
+                # Apply our sanitization function to handle NaN values
+                sanitized_course = sanitize_nan_values(course)
+                assistant_msg['courseData'] = sanitized_course
                 
+                chat_history.append(assistant_msg)
+                
+        chat_history_serializable = sanitize_nan_values(chat_history)
+        
         # Save updated history
         with open(history_path, 'w') as f:
-            json.dump(chat_history, f)
+            json.dump(chat_history_serializable, f)
             
         # Save query info for next time
         with open(last_query_path, 'w') as f:
             json.dump(query_info, f)
-            
-        return jsonify({
+        
+        # Prepare the response
+        response_data = {
             "response": ai_response, 
-            "history": chat_history
-        })
+            "history": chat_history_serializable
+        }
+        
+        # Return the response
+        return jsonify(response_data)
         
     except Exception as e:
         logger.error(f"Error processing message: {str(e)}")
-        return jsonify({'error': 'Could not process message'}), 500
+        return jsonify({
+            "response": "Sorry, I ran into an error. Try again!", 
+            "history": chat_history if 'chat_history' in locals() else []
+        }), 200
+
 
 @app.route('/api/chat/clear', methods=['POST'])
 @token_required
