@@ -13,6 +13,7 @@ import CourseCard from '../components/CourseCard';
  * @param {Object} obj - The object to sanitize
  * @returns {Object} - A new object with all NaN values replaced with null
  */
+// REPLACE this function
 const sanitizeForJSON = (obj) => {
   // Handle null, undefined, or primitive values
   if (obj === null || obj === undefined) return null;
@@ -65,9 +66,17 @@ function Chat() {
           axios.get('/api/chat/history'),
           axios.get('/api/profile')
         ]);
-        setMessages(historyRes.data);
+        
+        // Make sure historyRes.data is an array
+        const chatHistory = Array.isArray(historyRes.data) ? historyRes.data : [];
+        setMessages(chatHistory);
+        
         const profile = profileRes.data;
-        const hasInfo = profile.concentration && profile.year && profile.courses_taken?.length > 0;
+        // Add a null check for profile.courses_taken
+        const hasInfo = profile && profile.concentration && 
+                       profile.year && 
+                       Array.isArray(profile.courses_taken) && 
+                       profile.courses_taken.length > 0;
         setHasProfile(hasInfo);
         if (!hasInfo) navigate('/profile');
       } catch (err) {
@@ -107,41 +116,6 @@ function Chat() {
     return match ? `${match[1].toUpperCase()} ${match[2]}` : null;
   };
 
-    // Helper function to replace NaN values with null for JSON serialization
-  // Helper function to replace NaN values with null for JSON serialization
-const sanitizeForJSON = (obj) => {
-  if (obj === null || obj === undefined) return null;
-  
-  // Handle NaN specifically
-  if (typeof obj === 'number' && isNaN(obj)) return null;
-  
-  if (typeof obj !== 'object') return obj;
-  
-  // If it's an array, process each element
-  if (Array.isArray(obj)) {
-    return obj.map(item => sanitizeForJSON(item));
-  }
-  
-  // Process object properties
-  const result = {};
-  for (const key in obj) {
-    if (Object.prototype.hasOwnProperty.call(obj, key)) {
-      const value = obj[key];
-      
-      // Check specifically for NaN
-      if (typeof value === 'number' && isNaN(value)) {
-        result[key] = null;
-      } else if (typeof value === 'object') {
-        result[key] = sanitizeForJSON(value);
-      } else {
-        result[key] = value;
-      }
-    }
-  }
-  return result;
-};
-
-  // This is the updated part of your handleSubmit function that handles course data
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!input.trim() || sending) return;
@@ -149,13 +123,14 @@ const sanitizeForJSON = (obj) => {
     setInput('');
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
     setSending(true);
-
+  
     try {
       // Check if this is a course info request
       let courseData = null;
       const isCourseReq = isCourseInfoRequest(userMessage);
       console.log("Is this a course request?", isCourseReq);
       
+      // REPLACE this part in handleSubmit where you handle course requests
       if (isCourseReq) {
         const code = extractCourseCode(userMessage);
         console.log("Extracted course code:", code);
@@ -165,41 +140,90 @@ const sanitizeForJSON = (obj) => {
             console.log("Fetching course data for:", code);
             const courseRes = await axios.get(`/api/courses/${code}`);
             
-            // IMPORTANT: Sanitize the course data to replace NaN with null
-            courseData = sanitizeForJSON(courseRes.data);
+            // Create a manual sanitized copy
+            const sanitizedData = {};
+            
+            // Explicitly sanitize each property
+            for (const key in courseRes.data) {
+              const value = courseRes.data[key];
+              if (typeof value === "number" && isNaN(value)) {
+                sanitizedData[key] = null;
+              } else if (typeof value === "object" && value !== null) {
+                sanitizedData[key] = sanitizeForJSON(value);
+              } else {
+                sanitizedData[key] = value;
+              }
+            }
+            
+            courseData = sanitizedData;
             console.log("Sanitized course data:", courseData);
           } catch (err) {
             console.error('Failed to fetch course data:', err);
           }
         }
       }
-
+  
       // Get the AI response
       const response = await axios.post('/api/chat/message', { message: userMessage });
-      let updated = response.data.history;
-
-      // Handle comparison request
-      if (userMessage.toLowerCase().includes('compare')) {
-        // Your existing comparison logic...
-      } 
-      // If we have course data, add it to the assistant's message
-      else if (courseData) {
-        const lastAssistantMsgIndex = [...updated].reverse().findIndex(msg => msg.role === 'assistant');
-        if (lastAssistantMsgIndex !== -1) {
-          const trueIndex = updated.length - 1 - lastAssistantMsgIndex;
-          console.log("Adding course data to assistant message at index:", trueIndex);
-          
-          // Ensure the course data is properly sanitized
-          updated[trueIndex] = {
-            ...updated[trueIndex],
-            courseData: courseData, // Already sanitized
-          };
-        }
+      
+      // Check if we have a valid response
+      if (!response || !response.data) {
+        throw new Error("Received empty response from server");
       }
-
-      setMessages(updated);
+      
+      console.log("API Response:", response.data);
+      
+      // Extract the text response - this is critical if the history is truncated
+      const aiResponseText = response.data.response;
+      
+      // Try to use the history from the API, but have a fallback
+      if (response.data.history && Array.isArray(response.data.history)) {
+        try {
+          // Attempt to safely use the history
+          // Create a deep copy to avoid reference issues
+          const safeHistory = JSON.parse(JSON.stringify(response.data.history));
+          setMessages(safeHistory);
+        } catch (historyErr) {
+          console.warn("Could not process history from API, using fallback:", historyErr);
+          
+          // Fallback: use just the current exchange
+          if (aiResponseText) {
+            const updatedMessages = [
+              ...messages.filter(m => !(m.role === 'assistant' && m.content === 'Sorry, I ran into an error. Try again!')),
+              { role: 'user', content: userMessage },
+              { role: 'assistant', content: aiResponseText }
+            ];
+            
+            // If this was a course request and we have course data, add it
+            if (isCourseReq && courseData) {
+              updatedMessages[updatedMessages.length - 1].courseData = courseData;
+            }
+            
+            setMessages(updatedMessages);
+          }
+        }
+      } else if (aiResponseText) {
+        // No valid history but we have a response text
+        const updatedMessages = [
+          ...messages.filter(m => !(m.role === 'assistant' && m.content === 'Sorry, I ran into an error. Try again!')),
+          { role: 'user', content: userMessage },
+          { role: 'assistant', content: aiResponseText }
+        ];
+        
+        // If this was a course request and we have course data, add it
+        if (isCourseReq && courseData) {
+          updatedMessages[updatedMessages.length - 1].courseData = courseData;
+        }
+        
+        setMessages(updatedMessages);
+      } else {
+        // No history and no response text
+        throw new Error("Invalid response format from server");
+      }
     } catch (err) {
-      console.error(err);
+      console.error("Error in handleSubmit:", err);
+      
+      // Add a friendly error message
       setMessages(prev => [...prev, { 
         role: 'assistant', 
         content: 'Sorry, I ran into an error. Try again!' 
@@ -219,8 +243,9 @@ const sanitizeForJSON = (obj) => {
     }
   };
 
+  // REPLACE the entire normalizeCourseData function
   const normalizeCourseData = (data) => {
-    console.log("Original course data type:", typeof data);
+    console.log("Original course data:", data);
     
     if (!data) {
       console.error("No course data provided");
@@ -230,44 +255,38 @@ const sanitizeForJSON = (obj) => {
     // Convert the data to a usable object
     let courseData = data;
     
-    // If it's a string, we need to parse it, but we need to handle NaN values
+    // If it's a string, we need to parse it safely
     if (typeof data === 'string') {
       try {
         // Replace NaN in the string with null before parsing
         const cleanedString = data
           .replace(/:\s*NaN/g, ': null')
-          .replace(/:\s*"NaN"/g, ': null');
+          .replace(/:\s*"NaN"/g, ': null')
+          .replace(/NaN/g, 'null');
         
-        console.log("Cleaned JSON string:", cleanedString);
+        console.log("Cleaned JSON string for parsing");
         courseData = JSON.parse(cleanedString);
       } catch (e) {
         console.error("Failed to parse course data string:", e);
-        // Try a different approach
-        try {
-          // Try to evaluate the object directly (careful with this approach)
-          // This is needed because JSON.parse doesn't accept NaN
-          courseData = eval(`(${data})`);
-          // Immediately sanitize to replace any NaN values
-          courseData = sanitizeForJSON(courseData);
-        } catch (e2) {
-          console.error("Failed second parsing attempt:", e2);
-          return {}; // Give up and return empty object
-        }
+        
+        // If parsing fails completely, return empty object
+        return {};
       }
     }
     
-    console.log("Processed course data:", courseData);
+    // Sanitize the object to ensure no NaN values
+    courseData = sanitizeForJSON(courseData);
     
-    // Extract basic fields with safety checks
+    // Safe accessor functions
     const safeString = (field) => {
       const val = courseData[field];
-      if (val === null || val === undefined || Number.isNaN(val)) return '';
+      if (val === null || val === undefined || val !== val) return '';
       return String(val).trim();
     };
     
     const safeNumber = (field) => {
       const val = courseData[field];
-      if (val === null || val === undefined || Number.isNaN(val)) return null;
+      if (val === null || val === undefined || val !== val) return null;
       const num = parseFloat(val);
       return isNaN(num) ? null : num;
     };
@@ -292,30 +311,30 @@ const sanitizeForJSON = (obj) => {
       }
     };
     
-    // Extract core fields
-    const code = safeString('class_tag');
-    const title = safeString('class_name');
-    const description = safeString('description');
+    // Extract core fields with fallbacks
+    const code = safeString('class_tag') || '';
+    const title = safeString('class_name') || '';
+    const description = safeString('description') || '';
     const instructors = parseJsonArray('instructors');
     const instructorStr = Array.isArray(instructors) ? instructors.join(', ') : '';
     const days = parseJsonArray('days');
     const daysStr = Array.isArray(days) ? days.join(', ') : '';
     
-    // Build the normalized course object
+    // Build the normalized course object with fallbacks
     const normalized = {
       code: code,
       title: title,
       description: description,
-      instructor: instructorStr, 
-      term: safeString('term'),
+      instructor: instructorStr || '', 
+      term: safeString('term') || '',
       rating: safeNumber('overall_score_course_mean'),
       workload: safeNumber('mean_hours'),
       prerequisites: [],
       enrollment: safeNumber('current_enrollment_number'),
       tags: [],
-      schedule: daysStr,
-      qReportLink: safeString('q_report'),
-      units: safeString('units')
+      schedule: daysStr || '',
+      qReportLink: safeString('q_report') || '',
+      units: safeString('units') || ''
     };
     
     // Add prerequisites
@@ -340,75 +359,92 @@ const sanitizeForJSON = (obj) => {
     }
     
     return normalized;
-  };  
+  };
 
+  // REPLACE the first part of renderMessageContent function
   const renderMessageContent = (message) => {
-    if (message.role === 'assistant' && message.courseData) {
+    if (message && message.role === 'assistant' && message.courseData) {
       console.log("Found message with courseData:", 
         typeof message.courseData === 'string' 
           ? message.courseData.substring(0, 50) + '...' 
           : message.courseData
       );
       
-      // Normalize the course data
-      const normalized = normalizeCourseData(message.courseData);
-      
-      // Only render the CourseCard if we have the minimum essential data
-      const hasEssentialData = normalized && normalized.code && normalized.title;
-      console.log("Has essential data:", hasEssentialData);
-      
-      if (!hasEssentialData) {
-        console.warn("Missing essential course data for rendering card");
-      }
-      
-      return (
-        <>
-          <ReactMarkdown remarkPlugins={[remarkGfm]} className="prose dark:prose-dark mb-3">
-            {message.content}
+      try {
+        // Normalize the course data with extra safety
+        const normalized = normalizeCourseData(message.courseData);
+        
+        // Only render the CourseCard if we have the minimum essential data
+        const hasEssentialData = normalized && normalized.code && normalized.title;
+        console.log("Has essential data:", hasEssentialData);
+        
+        if (!hasEssentialData) {
+          console.warn("Missing essential course data for rendering card");
+        }
+        
+        return (
+          <>
+            <ReactMarkdown remarkPlugins={[remarkGfm]} className="prose dark:prose-dark mb-3">
+              {message.content || ''}
+            </ReactMarkdown>
+            
+            {hasEssentialData ? (
+              <div className="border border-accent-primary/20 dark:border-accent-primary/30 p-4 my-4 rounded-lg shadow-sm bg-white dark:bg-dark-200">
+                <CourseCard 
+                  course={normalized} 
+                  className="course-card-in-chat"
+                />
+                {normalized.qReportLink && (
+                  <div className="text-xs text-gray-500 mt-2 text-right">
+                    <a 
+                      href={normalized.qReportLink} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="text-accent-primary dark:text-accent-secondary hover:underline"
+                    >
+                      View Q Report
+                    </a>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-sm text-gray-400 italic mt-2 bg-gray-50 dark:bg-dark-300/50 p-3 rounded">
+                Course card data not available. Try asking for information on a specific course.
+              </div>
+            )}
+          </>
+        );
+      } catch (e) {
+        console.error("Error rendering course card:", e);
+        return (
+          <ReactMarkdown remarkPlugins={[remarkGfm]} className="prose dark:prose-dark">
+            {message?.content || ''}
           </ReactMarkdown>
-          
-          {hasEssentialData ? (
-            <div className="border border-accent-primary/20 dark:border-accent-primary/30 p-4 my-4 rounded-lg shadow-sm bg-white dark:bg-dark-200">
-              <CourseCard 
-                course={normalized} 
-                className="course-card-in-chat"
-              />
-              {normalized.qReportLink && (
-                <div className="text-xs text-gray-500 mt-2 text-right">
-                  <a 
-                    href={normalized.qReportLink} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    className="text-accent-primary dark:text-accent-secondary hover:underline"
-                  >
-                    View Q Report
-                  </a>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="text-sm text-gray-400 italic mt-2 bg-gray-50 dark:bg-dark-300/50 p-3 rounded">
-              Course card data not available. Try asking for information on a specific course.
-            </div>
-          )}
-        </>
-      );
+        );
+      }
     }
     
     return (
       <ReactMarkdown remarkPlugins={[remarkGfm]} className="prose dark:prose-dark">
-        {message.content}
+        {message?.content || ''}
       </ReactMarkdown>
     );
   };
 
-  if (!hasProfile) return null;
+  // Show loading spinner while data is being fetched
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin h-8 w-8 border-4 border-accent-primary border-t-transparent rounded-full"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="font-sans">
       <Navbar />
       <main className="flex flex-col items-center px-2 sm:px-6 pt-4 pb-36 max-w-4xl mx-auto min-h-screen">
-        {messages.length === 0 && !sending ? (
+        {Array.isArray(messages) && messages.length === 0 && !sending ? (
           <div className="welcome-message text-center mt-20 animate-fade-in">
             <div className="w-16 h-16 bg-accent-primary/10 dark:bg-accent-primary/20 rounded-full flex items-center justify-center mx-auto mb-6">
               <div className="text-3xl">🎓</div>
@@ -441,17 +477,17 @@ const sanitizeForJSON = (obj) => {
           </div>
         ) : (
           <div className="w-full space-y-5">
-            {messages.map((m, i) => (
+            {Array.isArray(messages) && messages.map((m, i) => (
               <div
                 key={i}
                 className={`px-5 py-4 rounded-xl transition-all duration-300 ${
-                  m.role === 'user'
+                  m?.role === 'user'
                     ? 'bg-white dark:bg-dark-200 text-gray-800 dark:text-dark-700 border border-gray-200/80 dark:border-dark-400/30 shadow-sm'
                     : 'bg-transparent text-gray-700 dark:text-dark-700'
                 }`}
               >
                 <div className="text-xs text-gray-400 dark:text-dark-500 mb-2 font-light">
-                  {m.role === 'assistant' ? 'ChatHarvard' : 'You'} • {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {m?.role === 'assistant' ? 'ChatHarvard' : 'You'} • {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>
                 {renderMessageContent(m)}
               </div>
@@ -518,7 +554,7 @@ const sanitizeForJSON = (obj) => {
       <CourseComparisonModal
         isOpen={compareModalOpen}
         onClose={() => setCompareModalOpen(false)}
-        courses={coursesToCompare}
+        courses={Array.isArray(coursesToCompare) ? coursesToCompare : []}
       />
     </div>
   );
