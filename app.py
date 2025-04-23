@@ -22,7 +22,7 @@ import PyPDF2
 from io import BytesIO
 
 from flask import Flask, request, jsonify, session, make_response
-
+import math
 
 # Import the enhanced modules
 from database import HarvardDatabase
@@ -54,6 +54,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger("ChatHarvard")
 
+# Add this after the imports
+def sanitize_nan_values(obj):
+    """Recursively sanitize NaN values in dictionaries and lists."""
+    if isinstance(obj, dict):
+        return {k: sanitize_nan_values(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [sanitize_nan_values(item) for item in obj]
+    elif isinstance(obj, float) and math.isnan(obj):
+        return None
+    else:
+        return obj
+
 # Initialize Flask app
 app = Flask(__name__, static_folder='frontend/build', static_url_path='')
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev_secret_key')
@@ -82,7 +94,7 @@ def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         token = None
-        
+
         # Get token from Authorization header
         if 'Authorization' in request.headers:
             token = request.headers['Authorization'].split(" ")[1]
@@ -91,10 +103,10 @@ def token_required(f):
 
         if not token:
             return jsonify({'message': 'Token is missing!'}), 401
-        
+
         try:
             data = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
-            
+
             # Store decoded values into session for current request
             session['user_id'] = data.get('user_id')
             session['auth_provider'] = data.get('auth_provider')
@@ -104,7 +116,7 @@ def token_required(f):
             return jsonify({'message': 'Invalid token!'}), 401
 
         return f(*args, **kwargs)
-    
+
     return decorated
 
 # Initialize database
@@ -112,33 +124,33 @@ def initialize_database():
     global harvard_db
     if harvard_db is not None:
         return harvard_db
-        
+
     try:
         logger.info("Loading data files")
         subjects_df = pd.read_csv(SUBJECTS_FILE)
         courses_df = pd.read_csv(COURSES_FILE)
         q_reports_df1 = pd.read_csv(Q_REPORTS_FILE_1)
         q_reports_df2 = pd.read_csv(Q_REPORTS_FILE_2)
-        
+
         # Combine Q Reports
         q_reports_df = pd.concat([q_reports_df1, q_reports_df2], ignore_index=True)
-        
+
         logger.info("Initializing database")
         harvard_db = HarvardDatabase(subjects_df, courses_df, q_reports_df)
-        
+
         # Process the data
         logger.info("Processing courses")
         harvard_db.process_courses()
-        
+
         logger.info("Processing Q reports")
         harvard_db.process_q_reports()
-        
+
         logger.info("Processing concentrations")
         harvard_db.process_concentrations()
-        
+
         logger.info("Building advanced indexes")
         harvard_db.build_indexes()
-        
+
         logger.info("Database initialization complete")
         return harvard_db
     except Exception as e:
@@ -167,7 +179,7 @@ def anthropic_callback():
     code = request.args.get('code')
     if not code:
         return jsonify({'error': 'No authorization code provided'}), 400
-    
+
     # Exchange code for token
     try:
         token_url = "https://auth.anthropic.com/oauth2/token"
@@ -180,7 +192,7 @@ def anthropic_callback():
         }
         response = requests.post(token_url, data=payload)
         token_data = response.json()
-        
+
         # Create user session
         user_id = str(uuid.uuid4())
         token = jwt.encode({
@@ -188,20 +200,20 @@ def anthropic_callback():
             'auth_provider': 'anthropic',
             'expires': (datetime.now() + timedelta(days=7)).isoformat()
         }, JWT_SECRET, algorithm="HS256")
-        
+
         # Store authentication info
         session['user_id'] = user_id
         session['auth_provider'] = 'anthropic'
         session['access_token'] = token_data.get('access_token')
         session['refresh_token'] = token_data.get('refresh_token')
         session['id_token'] = token_data.get('id_token')
-        
+
         # Return JWT token and redirect instructions
         return jsonify({
             'token': token,
             'redirect': '/#/profile'
         })
-        
+
     except Exception as e:
         logger.error(f"Auth error: {str(e)}")
         return jsonify({'error': 'Authentication failed'}), 400
@@ -222,7 +234,7 @@ def openai_callback():
     code = request.args.get('code')
     if not code:
         return jsonify({'error': 'No authorization code provided'}), 400
-    
+
     # Exchange code for token
     try:
         token_url = "https://auth0.openai.com/oauth/token"
@@ -235,7 +247,7 @@ def openai_callback():
         }
         response = requests.post(token_url, data=payload)
         token_data = response.json()
-        
+
         # Create user session
         user_id = str(uuid.uuid4())
         token = jwt.encode({
@@ -243,20 +255,20 @@ def openai_callback():
             'auth_provider': 'openai',
             'expires': (datetime.now() + timedelta(days=7)).isoformat()
         }, JWT_SECRET, algorithm="HS256")
-        
+
         # Store authentication info
         session['user_id'] = user_id
         session['auth_provider'] = 'openai'
         session['access_token'] = token_data.get('access_token')
         session['refresh_token'] = token_data.get('refresh_token')
         session['id_token'] = token_data.get('id_token')
-        
+
         # Return JWT token and redirect instructions
         return jsonify({
             'token': token,
             'redirect': '/#/profile'
         })
-        
+
     except Exception as e:
         logger.error(f"Auth error: {str(e)}")
         return jsonify({'error': 'Authentication failed'}), 400
@@ -283,7 +295,7 @@ def verify_auth():
 def get_profile():
     user_id = session.get('user_id')
     profile_path = f"user_data/{user_id}/profile.json"
-    
+
     try:
         if os.path.exists(profile_path):
             with open(profile_path, 'r') as f:
@@ -307,14 +319,14 @@ def save_profile():
     user_id = session.get('user_id')
     profile_dir = f"user_data/{user_id}"
     profile_path = f"{profile_dir}/profile.json"
-    
+
     try:
         os.makedirs(profile_dir, exist_ok=True)
-        
+
         profile = request.json
         with open(profile_path, 'w') as f:
             json.dump(profile, f)
-            
+
         return jsonify({'message': 'Profile saved successfully'})
     except Exception as e:
         logger.error(f"Error saving profile: {str(e)}")
@@ -326,7 +338,7 @@ def save_profile():
 def get_chat_history():
     user_id = session.get('user_id')
     history_path = f"user_data/{user_id}/chat_history.json"
-    
+
     try:
         if os.path.exists(history_path):
             with open(history_path, 'r') as f:
@@ -339,6 +351,11 @@ def get_chat_history():
         logger.error(f"Error getting chat history: {str(e)}")
         return jsonify({'error': 'Could not retrieve chat history'}), 500
 
+"""
+This function needs to be updated in your Flask backend (app.py).
+Replace the existing send_message route with this improved version that handles course data serialization better.
+"""
+
 @app.route('/api/chat/message', methods=['POST'])
 @token_required
 def send_message():
@@ -346,54 +363,54 @@ def send_message():
     user_dir = f"user_data/{user_id}"
     history_path = f"{user_dir}/chat_history.json"
     last_query_path = f"{user_dir}/last_query.json"
-    
+
     # Ensure user directory exists
     os.makedirs(user_dir, exist_ok=True)
-    
+
     try:
         # Get message from request
         data = request.json
         message = data.get('message')
-        
+
         # Load chat history
         chat_history = []
         if os.path.exists(history_path):
             with open(history_path, 'r') as f:
                 chat_history = json.load(f)
-        
+
         # Add user message to history
         chat_history.append({"role": "user", "content": message})
-        
+
         # Load last query info
         last_query_info = None
         if os.path.exists(last_query_path):
             with open(last_query_path, 'r') as f:
                 last_query_info = json.load(f)
-        
+
         # Load user profile
         profile_path = f"{user_dir}/profile.json"
         student_profile = {}
         if os.path.exists(profile_path):
             with open(profile_path, 'r') as f:
                 student_profile = json.load(f)
-        
+
         # Initialize database if needed
         if harvard_db is None:
             initialize_database()
-        
+
         # Process the query
         logger.info(f"Processing query: {message}")
         query_processor = QueryProcessor(message, chat_history, last_query_info)
         query_info = query_processor.process()
-        
+
         # Find relevant courses
         course_finder = CourseFinder(harvard_db)
         course_results = course_finder.find_courses(query_info, student_profile)
-        
+
         # Get recommendations
         recommender = CourseRecommender(harvard_db)
         recommendations = recommender.get_recommendations(query_info, student_profile)
-        
+
         # Build context
         context_builder = ContextBuilder(
             query_info, 
@@ -403,22 +420,22 @@ def send_message():
             harvard_db
         )
         context = context_builder.build_context()
-        
+
         # Generate response using appropriate client based on auth provider
         auth_provider = session.get('auth_provider')
         access_token = session.get('access_token')
-        
+
         system_prompt = """You are ChatHarvard, a specialized academic advisor for Harvard University students.
         Your purpose is to help students with course selection, academic planning, and understanding 
         degree requirements. Use the provided context about Harvard courses, Q Reports, and degree 
         requirements to give accurate, helpful, and personalized information.
-        
+
         Your responses should be based entirely on the provided context, which contains:
         1. Query analysis - Understanding of the student's question with confidence scores
         2. Retrieval reasoning - How courses were found and ranked based on the query
         3. Course information - Detailed data about relevant courses
         4. Student profile - The student's concentration and courses taken
-        
+
         When answering questions:
         1. Reference specific course codes and names (e.g., MATH 131, CS 124)
         2. Consider the student's concentration and courses already taken
@@ -426,27 +443,27 @@ def send_message():
         4. Be honest about prerequisites and potential issues flagged in verification sections
         5. Format your answers clearly with appropriate structure
         6. If there are ambiguities or uncertainties noted in the context, acknowledge them
-        
+
         Your goal is to provide well-reasoned, accurate academic advice that helps the student make 
         informed decisions about their course selection and academic path at Harvard.
-        
+
         IMPORTANT: Always use the workload data provided in the context when discussing course workload.
         If there is a workload comparison table, make sure to reference those values explicitly.
-        
+
         Format your answers with Markdown formatting for better readability.
         """
-        
+
         # Prepare messages for the API
         messages = []
         for msg in chat_history[-10:]:  # Use last 10 messages for context
             messages.append({"role": msg["role"], "content": msg["content"]})
-        
+
         # Add the current question with context
         messages.append({
             "role": "user", 
             "content": f"Based on the following information about Harvard courses and requirements:\n\n{context}\n\nStudent question: {message}"
         })
-        
+
         # Choose API client based on auth provider
         ai_response = None
         if auth_provider == 'anthropic':
@@ -468,44 +485,58 @@ def send_message():
             ai_response = response.choices[0].message.content
         else:
             ai_response = "Error: Unable to generate response due to authentication issue."
-            
+
         # Add assistant's response to history
-        chat_history.append({"role": "assistant", "content": ai_response})
+        assistant_msg = {"role": "assistant", "content": ai_response}
+
+        # Add course data if relevant
         course_code_match = re.search(r'\b([A-Za-z]{2,4})\s*(\d{1,3}[A-Za-z]*)\b', message)
+        chat_history.append(assistant_msg)
         if course_code_match:
             course_code = f"{course_code_match.group(1).upper()} {course_code_match.group(2)}"
             course = harvard_db.get_course_by_code(course_code)
             if course:
-                chat_history[-1]['courseData'] = course
-                
+                # Apply sanitization to handle NaN values
+                sanitized_course = sanitize_nan_values(course)
+                assistant_msg['courseData'] = sanitized_course
+
+        chat_history_serializable = sanitize_nan_values(chat_history)
+
         # Save updated history
         with open(history_path, 'w') as f:
-            json.dump(chat_history, f)
-            
+            json.dump(chat_history_serializable, f)
+
         # Save query info for next time
         with open(last_query_path, 'w') as f:
             json.dump(query_info, f)
-            
-        return jsonify({
+
+        # Prepare the response
+        response_data = {
             "response": ai_response, 
-            "history": chat_history
-        })
-        
+            "history": chat_history_serializable
+        }
+
+        # Return the response
+        return jsonify(response_data)
+
     except Exception as e:
         logger.error(f"Error processing message: {str(e)}")
-        return jsonify({'error': 'Could not process message'}), 500
+        return jsonify({
+            "response": "Sorry, I ran into an error. Try again!", 
+            "history": chat_history if 'chat_history' in locals() else []
+        }), 200
 
 @app.route('/api/chat/clear', methods=['POST'])
 @token_required
 def clear_chat():
     user_id = session.get('user_id')
     history_path = f"user_data/{user_id}/chat_history.json"
-    
+
     try:
         # Create an empty chat history
         if os.path.exists(history_path):
             os.remove(history_path)
-            
+
         return jsonify({'message': 'Chat history cleared successfully'})
     except Exception as e:
         logger.error(f"Error clearing chat: {str(e)}")
@@ -514,7 +545,7 @@ def clear_chat():
 @app.route('/api/auth/set_api_key', methods=['POST', 'OPTIONS'])
 def set_api_key():
     origin = request.headers.get('Origin', '')
-    
+
     def corsify(response):
         response.headers['Access-Control-Allow-Origin'] = origin if origin == 'http://localhost:3000' else ''
         response.headers['Access-Control-Allow-Credentials'] = 'true'
@@ -547,10 +578,10 @@ def set_api_key():
                 return corsify(jsonify({'error': 'Invalid Anthropic API key format'})), 400
             session['access_token'] = api_key
         else:
-            default_key = os.getenv(f'DEFAULT_{provider.upper()}_API_KEY')
-            if not default_key:
+            defaultkey = os.getenv(f'DEFAULT_{provider.upper()}_API_KEY')
+            if not defaultkey:
                 return corsify(jsonify({'error': f'No default {provider} key available'})), 400
-            session['access_token'] = default_key
+            session['access_token'] = defaultkey
 
         token = jwt.encode({
             'user_id': user_id,
@@ -565,7 +596,6 @@ def set_api_key():
         logger.error(f"Error in set_api_key: {str(e)}")
         return corsify(jsonify({'error': f'Server error: {str(e)}'})), 500
 
-
 # Concentration data route
 @app.route('/api/concentrations', methods=['GET'])
 @token_required
@@ -573,14 +603,13 @@ def get_concentrations():
     # Initialize database if needed
     if harvard_db is None:
         initialize_database()
-        
+
     try:
         concentrations = list(harvard_db.concentration_dict.keys())
         return jsonify(concentrations)
     except Exception as e:
         logger.error(f"Error getting concentrations: {str(e)}")
         return jsonify({'error': 'Could not retrieve concentrations'}), 500
-
 
 @app.after_request
 def apply_cors(response):
@@ -604,7 +633,7 @@ def validate_api_key():
         response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
         response.headers.add('Access-Control-Allow-Methods', 'POST,OPTIONS')
         return response
-    
+
     # For POST request, process normally
     # Add explicit CORS headers
     response_headers = {
@@ -612,11 +641,11 @@ def validate_api_key():
         'Access-Control-Allow-Headers': 'Content-Type,Authorization',
         'Access-Control-Allow-Methods': 'POST,OPTIONS'
     }
-    
+
     data = request.get_json()
     api_key = data.get('api_key')
     provider = data.get('provider')
-    
+
     # Log the request for debugging
     logger.info(f"Validating API key for provider: {provider}")
 
@@ -629,8 +658,8 @@ def validate_api_key():
 
     if not api_key:
         # If no key provided, check if we have a default one
-        default_key = os.getenv(f'DEFAULT_{provider.upper()}_API_KEY')
-        if default_key:
+        defaultkey = os.getenv(f'DEFAULT{provider.upper()}_API_KEY')
+        if defaultkey:
             logger.info(f"Using default {provider} key")
             response = jsonify({'valid': True})
             for key, value in response_headers.items():
@@ -646,7 +675,7 @@ def validate_api_key():
     # Simple validation based on format without API calls
     valid = False
     error_message = 'Invalid API key format'
-    
+
     try:
         if provider == 'openai':
             if api_key.startswith('sk-'):
@@ -691,49 +720,49 @@ def extract_courses_from_pdf():
         response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
         response.headers.add('Access-Control-Allow-Methods', 'POST,OPTIONS')
         return response
-        
+
     if 'pdf' not in request.files:
         return jsonify({'error': 'No PDF file provided'}), 400
-    
+
     pdf_file = request.files['pdf']
-    
+
     if pdf_file.filename == '':
         return jsonify({'error': 'No PDF file selected'}), 400
-    
+
     try:
         # Read PDF content
         pdf_bytes = pdf_file.read()
         pdf_file_obj = BytesIO(pdf_bytes)
-        
+
         # Parse PDF
         pdf_reader = PyPDF2.PdfReader(pdf_file_obj)
         text_content = ""
-        
+
         # Extract text from all pages
         for page_num in range(len(pdf_reader.pages)):
             page = pdf_reader.pages[page_num]
             text_content += page.extract_text()
-        
+
         # Regular expression to find course codes
         # This pattern looks for common Harvard course code formats
         # Adjust as needed based on actual transcript formats
         course_pattern = r'\b([A-Za-z]{2,4})\s*(\d{1,3}[A-Za-z]{0,2})\b'
         matches = re.findall(course_pattern, text_content)
-        
+
         # Format the matches
         courses = []
         for dept, num in matches:
             course_code = f"{dept.upper()} {num}"
             courses.append(course_code)
-        
+
         # Remove duplicates while preserving order
         unique_courses = []
         for course in courses:
             if course not in unique_courses:
                 unique_courses.append(course)
-        
+
         return jsonify({'courses': unique_courses})
-    
+
     except Exception as e:
         logger.error(f"Error extracting courses from PDF: {str(e)}")
         return jsonify({'error': f'Failed to process PDF: {str(e)}'}), 500
@@ -751,16 +780,16 @@ def get_shared_profile(share_id):
         response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
         response.headers.add('Access-Control-Allow-Methods', 'GET,OPTIONS')
         return response
-        
+
     try:
         # This is a simplified implementation - in a real app, you would
         # look up the share_id in a database to get the associated user data
         # Here we're just returning a mock profile
-        
+
         # For now, just validate that share_id is alphanumeric
         if not re.match(r'^[a-zA-Z0-9]+$', share_id):
             return jsonify({'error': 'Invalid share ID'}), 400
-            
+
         # In a real implementation, you would fetch this data from a database
         # based on the share_id
         return jsonify({
@@ -786,7 +815,7 @@ def get_shared_profile(share_id):
 def get_course_by_code(course_code):
     # Decode URL-encoded spaces (e.g., MATH%20121 → MATH 121)
     course_code = course_code.replace('%20', ' ').upper()
-    
+
     try:
         # Initialize DB if needed
         if harvard_db is None:
@@ -801,14 +830,12 @@ def get_course_by_code(course_code):
         logger.error(f"Error getting course by code: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
-
 if __name__ == "__main__":
-    # Initialize the database on startup
+        # Initialize the database on startup
     initialize_database()
-    
+
     # Create user_data directory
     os.makedirs("user_data", exist_ok=True)
-    
+
     # Run the app
     app.run(debug=True, host="0.0.0.0", port=5050)
-
