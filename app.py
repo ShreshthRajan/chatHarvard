@@ -34,6 +34,9 @@ from course_recommender import CourseRecommender
 # Load environment variables
 load_dotenv()
 
+PORT = int(os.getenv("PORT", 5050))
+
+
 # Configuration
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
@@ -831,11 +834,13 @@ def get_course_by_code(course_code):
         return jsonify({'error': 'Internal server error'}), 500
 
 if __name__ == "__main__":
-        # Initialize the database on startup
+    # Initialize the database on startup
     initialize_database()
-
+    
     # Create user_data directory
     os.makedirs("user_data", exist_ok=True)
-
+    
     # Run the app
-    app.run(debug=True, host="0.0.0.0", port=5050)
+    app.run(debug=os.getenv("ENVIRONMENT") != "production", 
+            host="0.0.0.0", 
+            port=PORT)
