@@ -546,9 +546,16 @@ def clear_chat():
 @app.route('/api/auth/set_api_key', methods=['POST', 'OPTIONS'])
 def set_api_key():
     origin = request.headers.get('Origin', '')
+    allowed_origins = ["http://localhost:3000", "https://chat-harvard.vercel.app"]
 
     def corsify(response):
-        response.headers['Access-Control-Allow-Origin'] = origin if origin == 'http://localhost:3000' or 'https://chat-harvard.vercel.app' else ''
+        if origin in allowed_origins:  # Check if origin is IN the list
+            response.headers['Access-Control-Allow-Origin'] = origin
+        else:
+            # For debugging purposes, log unexpected origins
+            logger.warning(f"Received request from non-allowed origin: {origin}")
+            # Don't set CORS headers for non-allowed origins
+        
         response.headers['Access-Control-Allow-Credentials'] = 'true'
         response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
         response.headers['Access-Control-Allow-Methods'] = 'POST,OPTIONS'
@@ -617,11 +624,19 @@ def apply_cors(response):
     origin = request.headers.get('Origin')
     allowed_origins = ["http://localhost:3000", "https://chat-harvard.vercel.app"]
     
-    if origin in allowed_origins:  # Check if origin is in the list, not equal to the list
+    # Debug logging to help diagnose CORS issues
+    logger.info(f"Received request from origin: {origin}")
+    logger.info(f"Is origin in allowed list: {origin in allowed_origins}")
+    
+    if origin in allowed_origins:  # Check if origin is in the list
         response.headers['Access-Control-Allow-Origin'] = origin
         response.headers['Access-Control-Allow-Credentials'] = 'true'
         response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
         response.headers['Access-Control-Allow-Methods'] = 'GET,POST,OPTIONS,PUT,DELETE'
+        logger.info(f"Setting CORS headers for allowed origin: {origin}")
+    else:
+        logger.warning(f"Origin not in allowed list: {origin}")
+        
     return response
 
 @app.route('/api/auth/validate_key', methods=['POST', 'OPTIONS'])

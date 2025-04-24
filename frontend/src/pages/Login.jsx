@@ -73,6 +73,14 @@ function Login() {
     try {
       console.log(`Logging in with ${provider} ${apiKey ? 'using provided key' : 'using default key'}`);
       
+      // Check if we're using the correct URL
+      if (axios.defaults.baseURL.includes('your-railway-app-url')) {
+        console.error('Invalid baseURL detected! Fixing it...');
+        axios.defaults.baseURL = 'https://web-production-1ada.up.railway.app';
+      }
+      
+      console.log('Using baseURL:', axios.defaults.baseURL);
+      
       // Use the baseURL configured in App.jsx
       const response = await axios.post('/api/auth/set_api_key', {
         provider: provider,
@@ -106,7 +114,7 @@ function Login() {
       setLoading(false);
     }
   };
-
+  
   const handleCopyShareLink = () => {
     navigator.clipboard.writeText(shareableLink);
     toast.success('Link copied to clipboard!');
