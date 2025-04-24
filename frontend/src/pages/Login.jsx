@@ -73,6 +73,7 @@ function Login() {
     try {
       console.log(`Logging in with ${provider} ${apiKey ? 'using provided key' : 'using default key'}`);
       
+      // Use the baseURL configured in App.jsx
       const response = await axios.post('/api/auth/set_api_key', {
         provider: provider,
         api_key: apiKey || null,

@@ -548,7 +548,7 @@ def set_api_key():
     origin = request.headers.get('Origin', '')
 
     def corsify(response):
-        response.headers['Access-Control-Allow-Origin'] = origin if origin == 'http://localhost:3000' else ''
+        response.headers['Access-Control-Allow-Origin'] = origin if origin == 'http://localhost:3000' or 'https://chat-harvard.vercel.app' else ''
         response.headers['Access-Control-Allow-Credentials'] = 'true'
         response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
         response.headers['Access-Control-Allow-Methods'] = 'POST,OPTIONS'
@@ -615,7 +615,9 @@ def get_concentrations():
 @app.after_request
 def apply_cors(response):
     origin = request.headers.get('Origin')
-    if origin == "http://localhost:3000":  # allowlist check
+    allowed_origins = ["http://localhost:3000", "https://chat-harvard.vercel.app"]
+    
+    if origin in allowed_origins:  # Check if origin is in the list, not equal to the list
         response.headers['Access-Control-Allow-Origin'] = origin
         response.headers['Access-Control-Allow-Credentials'] = 'true'
         response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'

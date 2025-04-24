@@ -19,8 +19,13 @@ import { ToastProvider } from './context/ToastContext';
 // Styles
 import './index.css';
 
+const isProduction = window.location.hostname !== 'localhost';
+const API_BASE_URL = isProduction 
+  ? 'https://web-production-1ada.up.railway.app' 
+  : 'http://localhost:5050';
+
 // Configure axios defaults
-axios.defaults.baseURL = 'http://localhost:5050';
+axios.defaults.baseURL = API_BASE_URL;
 axios.defaults.withCredentials = true;
 axios.defaults.headers.common['Content-Type'] = 'application/json';
 
