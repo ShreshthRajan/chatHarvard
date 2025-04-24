@@ -1,8 +1,11 @@
 [phases.setup]
 nixPkgs = ["python311", "gcc"]
+aptPkgs = []
+ignoreBuildDependencies = ["nodejs", "npm"]
 
 [phases.install]
 cmds = ["pip install -r requirements.txt"]
+dependencyFile = "requirements.txt"
 
 [start]
 cmd = "gunicorn 'app:app' --bind=0.0.0.0:$PORT"

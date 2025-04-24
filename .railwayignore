@@ -1,0 +1,5 @@
+# Ignore frontend directory
+frontend/
+node_modules/
+package.json
+package-lock.json
