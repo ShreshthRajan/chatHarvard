@@ -832,11 +832,17 @@ def get_course_by_code(course_code):
         return jsonify({'error': 'Internal server error'}), 500
 
 if __name__ == "__main__":
-        # Initialize the database on startup
+    # Initialize the database on startup
     initialize_database()
 
     # Create user_data directory
     os.makedirs("user_data", exist_ok=True)
 
+    # Get port from environment variable or use default
+    port = int(os.environ.get("PORT", 5050))
+    
+    # In production, don't use debug mode
+    debug = os.environ.get("ENVIRONMENT", "development") == "development"
+    
     # Run the app
-    app.run(debug=True, host="0.0.0.0", port=5050)
+    app.run(debug=debug, host="0.0.0.0", port=port)
