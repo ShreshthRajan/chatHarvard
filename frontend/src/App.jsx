@@ -19,10 +19,15 @@ import { ToastProvider } from './context/ToastContext';
 // Styles
 import './index.css';
 
+// Restore your original configuration that works locally
 const isProduction = window.location.hostname !== 'localhost';
 const API_BASE_URL = isProduction 
   ? 'https://web-production-1ada.up.railway.app' 
   : 'http://localhost:5050';
+
+// Add debugging to see what URL is being used
+console.log('Environment:', isProduction ? 'Production' : 'Development');
+console.log('API base URL:', API_BASE_URL);
 
 // Configure axios defaults
 axios.defaults.baseURL = API_BASE_URL;

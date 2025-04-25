@@ -361,12 +361,18 @@ Replace the existing send_message route with this improved version that handles 
 @token_required
 def send_message():
     user_id = session.get('user_id')
+    auth_provider = session.get('auth_provider')
+    access_token = session.get('access_token')
+    
     user_dir = f"user_data/{user_id}"
     history_path = f"{user_dir}/chat_history.json"
     last_query_path = f"{user_dir}/last_query.json"
 
     # Ensure user directory exists
     os.makedirs(user_dir, exist_ok=True)
+    
+    logger.info(f"Auth provider: {auth_provider}")
+    logger.info(f"Access token set: {access_token is not None}")
 
     try:
         # Get message from request
@@ -423,9 +429,8 @@ def send_message():
         context = context_builder.build_context()
 
         # Generate response using appropriate client based on auth provider
-        auth_provider = session.get('auth_provider')
-        access_token = session.get('access_token')
-
+        # Use the variables we retrieved at the top of the function
+        
         system_prompt = """You are ChatHarvard, a specialized academic advisor for Harvard University students.
         Your purpose is to help students with course selection, academic planning, and understanding 
         degree requirements. Use the provided context about Harvard courses, Q Reports, and degree 
@@ -468,24 +473,43 @@ def send_message():
         # Choose API client based on auth provider
         ai_response = None
         if auth_provider == 'anthropic':
-            client = anthropic.Anthropic(api_key=access_token)
-            response = client.messages.create(
-                model="claude-3-7-sonnet-20250219",
-                max_tokens=2000,
-                system=system_prompt,
-                messages=messages
-            )
-            ai_response = response.content[0].text
+            try:
+                if not access_token:
+                    logger.error("Missing Anthropic API key in session")
+                    raise ValueError("No API key available for Anthropic")
+                
+                logger.info(f"Using Anthropic API with key starting with: {access_token[:5] if access_token else 'None'}")
+                client = anthropic.Anthropic(api_key=access_token)
+                response = client.messages.create(
+                    model="claude-3-7-sonnet-20250219",
+                    max_tokens=2000,
+                    system=system_prompt,
+                    messages=messages
+                )
+                ai_response = response.content[0].text
+            except Exception as api_err:
+                logger.error(f"Anthropic API error: {str(api_err)}")
+                ai_response = f"Sorry, I encountered an error when using the Anthropic API. Error details have been logged."
         elif auth_provider == 'openai':
-            client = openai.Client(api_key=access_token)
-            response = client.chat.completions.create(
-                model="gpt-4-turbo",
-                messages=[{"role": "system", "content": system_prompt}] + messages,
-                max_tokens=2000
-            )
-            ai_response = response.choices[0].message.content
+            try:
+                if not access_token:
+                    logger.error("Missing OpenAI API key in session")
+                    raise ValueError("No API key available for OpenAI")
+                
+                logger.info(f"Using OpenAI API with key starting with: {access_token[:5] if access_token else 'None'}")
+                client = openai.Client(api_key=access_token)
+                response = client.chat.completions.create(
+                    model="gpt-4-turbo",
+                    messages=[{"role": "system", "content": system_prompt}] + messages,
+                    max_tokens=2000
+                )
+                ai_response = response.choices[0].message.content
+            except Exception as api_err:
+                logger.error(f"OpenAI API error: {str(api_err)}")
+                ai_response = f"Sorry, I encountered an error when using the OpenAI API. Error details have been logged."
         else:
-            ai_response = "Error: Unable to generate response due to authentication issue."
+            logger.error(f"Unknown auth provider: {auth_provider}")
+            ai_response = "Error: Unable to generate response due to unknown authentication provider."
 
         # Add assistant's response to history
         assistant_msg = {"role": "assistant", "content": ai_response}
