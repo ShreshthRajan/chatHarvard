@@ -73,6 +73,7 @@ app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev_secret_key')
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_PERMANENT'] = True
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
+app.config['SESSION_FILE_DIR'] = '/tmp/flask_session'
 
 # Initialize session
 Session(app)
@@ -111,6 +112,7 @@ def token_required(f):
             # Store decoded values into session for current request
             session['user_id'] = data.get('user_id')
             session['auth_provider'] = data.get('auth_provider')
+            session['access_token'] = data.get('access_token')
         except jwt.ExpiredSignatureError:
             return jsonify({'message': 'Token has expired!'}), 401
         except jwt.InvalidTokenError:
@@ -618,6 +620,7 @@ def set_api_key():
         token = jwt.encode({
             'user_id': user_id,
             'auth_provider': provider,
+            'access_token': session['access_token'],  # Add this line
             'expires': (datetime.now() + timedelta(days=7)).isoformat()
         }, JWT_SECRET, algorithm="HS256")
 
@@ -700,7 +703,7 @@ def validate_api_key():
 
     if not api_key:
         # If no key provided, check if we have a default one
-        defaultkey = os.getenv(f'DEFAULT{provider.upper()}_API_KEY')
+        defaultkey = os.getenv(f'DEFAULT_{provider.upper()}_API_KEY')
         if defaultkey:
             logger.info(f"Using default {provider} key")
             response = jsonify({'valid': True})
