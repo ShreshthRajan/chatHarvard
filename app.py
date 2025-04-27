@@ -753,64 +753,137 @@ def validate_api_key():
         return response
 
 @app.route('/api/extract_courses', methods=['POST', 'OPTIONS'])
-@token_required
 def extract_courses_from_pdf():
     """
     Extract course codes from a PDF transcript
     """
-    # For OPTIONS request, return preflight response
+    # For OPTIONS request, return preflight response WITHOUT token check
     if request.method == 'OPTIONS':
-        response = jsonify({'status': 'success'})
-        response.headers.add('Access-Control-Allow-Origin', '*')
+        response = make_response('', 200)
+        response.headers.add('Access-Control-Allow-Origin', request.headers.get('Origin', '*'))
         response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
         response.headers.add('Access-Control-Allow-Methods', 'POST,OPTIONS')
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
         return response
 
-    if 'pdf' not in request.files:
-        return jsonify({'error': 'No PDF file provided'}), 400
+    # For POST request, check token manually
+    if request.method == 'POST':
+        # Get token from header or cookie
+        token = None
+        if 'Authorization' in request.headers:
+            token = request.headers['Authorization'].split(" ")[1]
+        elif request.cookies.get('token'):
+            token = request.cookies.get('token')
 
-    pdf_file = request.files['pdf']
+        if not token:
+            return jsonify({'error': 'Token is missing!'}), 401
 
-    if pdf_file.filename == '':
-        return jsonify({'error': 'No PDF file selected'}), 400
+        try:
+            data = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+            session['user_id'] = data.get('user_id')
+            session['auth_provider'] = data.get('auth_provider')
+            session['access_token'] = data.get('access_token')
+        except jwt.ExpiredSignatureError:
+            return jsonify({'error': 'Token has expired!'}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({'error': 'Invalid token!'}), 401
 
-    try:
-        # Read PDF content
-        pdf_bytes = pdf_file.read()
-        pdf_file_obj = BytesIO(pdf_bytes)
+        # Now proceed with the POST logic
+        if 'pdf' not in request.files:
+            return jsonify({'error': 'No PDF file provided'}), 400
 
-        # Parse PDF
-        pdf_reader = PyPDF2.PdfReader(pdf_file_obj)
-        text_content = ""
+        pdf_file = request.files['pdf']
 
-        # Extract text from all pages
-        for page_num in range(len(pdf_reader.pages)):
-            page = pdf_reader.pages[page_num]
-            text_content += page.extract_text()
+        if pdf_file.filename == '':
+            return jsonify({'error': 'No PDF file selected'}), 400
 
-        # Regular expression to find course codes
-        # This pattern looks for common Harvard course code formats
-        # Adjust as needed based on actual transcript formats
-        course_pattern = r'\b([A-Za-z]{2,4})\s*(\d{1,3}[A-Za-z]{0,2})\b'
-        matches = re.findall(course_pattern, text_content)
+        try:
+            # Read PDF content
+            pdf_bytes = pdf_file.read()
+            pdf_file_obj = BytesIO(pdf_bytes)
 
-        # Format the matches
-        courses = []
-        for dept, num in matches:
-            course_code = f"{dept.upper()} {num}"
-            courses.append(course_code)
+            # Parse PDF
+            pdf_reader = PyPDF2.PdfReader(pdf_file_obj)
+            text_content = ""
 
-        # Remove duplicates while preserving order
-        unique_courses = []
-        for course in courses:
-            if course not in unique_courses:
-                unique_courses.append(course)
+            # Check if PDF is encrypted and attempt decryption
+            if pdf_reader.is_encrypted:
+                try:
+                    pdf_reader.decrypt('')
+                except:
+                    logger.warning("PDF is encrypted and could not be decrypted")
 
-        return jsonify({'courses': unique_courses})
+            # Extract text from all pages
+            for page_num in range(len(pdf_reader.pages)):
+                try:
+                    page = pdf_reader.pages[page_num]
+                    page_text = page.extract_text()
+                    if page_text:
+                        text_content += page_text + "\n"
+                except Exception as page_error:
+                    logger.warning(f"Error extracting text from page {page_num}: {str(page_error)}")
+                    continue
 
-    except Exception as e:
-        logger.error(f"Error extracting courses from PDF: {str(e)}")
-        return jsonify({'error': f'Failed to process PDF: {str(e)}'}), 500
+            # If no text was extracted, return an error
+            if not text_content or not text_content.strip():
+                logger.warning("No text content extracted from PDF")
+                return jsonify({'error': 'Could not extract text from PDF. The file may be encrypted, an image-based PDF, or have text protection.'}), 400
+
+            # Log extracted text for debugging
+            logger.info(f"Extracted text from PDF (first 500 chars): {text_content[:500]}")
+
+            # Pattern for Harvard course codes format
+            course_pattern = r'\b([A-Z]{2,}(?:-[A-Z]{2,})?)\s+(\d{1,3}[A-Za-z]{0,2})\b'
+            
+            # Find matches
+            all_matches = re.findall(course_pattern, text_content)
+            
+            # Debug log
+            logger.info(f"Found matches: {all_matches}")
+
+            # Format and filter the matches
+            courses = []
+            for dept, num in all_matches:
+                course_code = f"{dept.upper()} {num}"
+                
+                # Filter out patterns that don't look like real courses
+                # Skip if department is a common term
+                common_words = ['TOTAL', 'PROBLEM', 'EFFECTIVE', 'SEP', 'OCT', 'NOV', 'DEC', 
+                               'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG',
+                               'WRITING', 'CALCULUS', 'SCIENCE']
+                
+                if dept.upper() in common_words:
+                    continue
+                    
+                # Ensure course number makes sense (1-999)
+                num_part = ''.join(filter(str.isdigit, num))
+                if num_part and 1 <= int(num_part) <= 999:
+                    courses.append(course_code)
+
+            # Additional filtering based on length of department code
+            # Most Harvard departments are 2-8 characters
+            filtered_courses = []
+            for course in courses:
+                dept, _ = course.split()
+                if 2 <= len(dept) <= 10:  # Reasonable department code length
+                    filtered_courses.append(course)
+
+            # Remove duplicates while preserving order
+            unique_courses = []
+            for course in filtered_courses:
+                if course not in unique_courses:
+                    unique_courses.append(course)
+
+            # Log the final result
+            logger.info(f"Extracted courses: {unique_courses}")
+
+            return jsonify({'courses': unique_courses})
+
+        except Exception as e:
+            logger.error(f"Error extracting courses from PDF: {str(e)}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            logger.error(f"Full traceback:", exc_info=True)
+            return jsonify({'error': f'Failed to process PDF: {str(e)}'}), 500
 
 # Add a route to handle shared links
 @app.route('/api/shared/<share_id>', methods=['GET', 'OPTIONS'])
