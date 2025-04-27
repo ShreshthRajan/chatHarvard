@@ -751,7 +751,6 @@ def validate_api_key():
         for key, value in response_headers.items():
             response[0].headers[key] = value
         return response
-
 @app.route('/api/extract_courses', methods=['POST', 'OPTIONS'])
 def extract_courses_from_pdf():
     """
@@ -832,8 +831,13 @@ def extract_courses_from_pdf():
             # Log extracted text for debugging
             logger.info(f"Extracted text from PDF (first 500 chars): {text_content[:500]}")
 
-            # Pattern for Harvard course codes format
-            course_pattern = r'\b([A-Z]{2,}(?:-[A-Z]{2,})?)\s+(\d{1,3}[A-Za-z]{0,2})\b'
+            # Updated pattern for Harvard course codes format
+            # This now supports:
+            # - Regular courses (MATH 121)
+            # - Hyphenated departments (ENG-SCI 139)
+            # - GENED courses (GENED 1102)
+            # - 4-digit course numbers (COMPSCI 2420)
+            course_pattern = r'\b([A-Z]{2,}(?:-[A-Z]{2,})?)\s+(\d{1,4}[A-Za-z]{0,2})\b'
             
             # Find matches
             all_matches = re.findall(course_pattern, text_content)
@@ -855,13 +859,13 @@ def extract_courses_from_pdf():
                 if dept.upper() in common_words:
                     continue
                     
-                # Ensure course number makes sense (1-999)
+                # Ensure course number makes sense (1-9999)
                 num_part = ''.join(filter(str.isdigit, num))
-                if num_part and 1 <= int(num_part) <= 999:
+                if num_part and 1 <= int(num_part) <= 9999:  # Changed to 9999 to handle 4-digit courses
                     courses.append(course_code)
 
             # Additional filtering based on length of department code
-            # Most Harvard departments are 2-8 characters
+            # Most Harvard departments are 2-10 characters
             filtered_courses = []
             for course in courses:
                 dept, _ = course.split()
@@ -884,7 +888,7 @@ def extract_courses_from_pdf():
             logger.error(f"Exception type: {type(e).__name__}")
             logger.error(f"Full traceback:", exc_info=True)
             return jsonify({'error': f'Failed to process PDF: {str(e)}'}), 500
-
+        
 # Add a route to handle shared links
 @app.route('/api/shared/<share_id>', methods=['GET', 'OPTIONS'])
 def get_shared_profile(share_id):
