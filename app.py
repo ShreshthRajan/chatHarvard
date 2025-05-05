@@ -31,6 +31,9 @@ from query_processor import QueryProcessor
 from context_builder import ContextBuilder
 from course_recommender import CourseRecommender
 
+import os
+os.makedirs('/tmp/flask_session', exist_ok=True)
+
 # Load environment variables
 load_dotenv()
 

@@ -584,8 +584,24 @@ class HarvardDatabase:
     
     def get_courses_by_term(self, term: str) -> List[Dict]:
         """Get courses by term (e.g., 'Fall 2023')"""
+        # Get course IDs for the specified term
         course_ids = self.courses_by_term.get(term, [])
-        return [self.get_course_by_id(cid) for cid in course_ids if cid in self.course_dict]
+        
+        # Return all courses that match the term, regardless of missing fields
+        matched_courses = []
+        for cid in course_ids:
+            if cid in self.course_dict:
+                course = self.get_course_by_id(cid)
+                # IMPORTANT: Include ALL courses that match the term, even if they have null fields
+                matched_courses.append(course)
+        
+        # Add extra logging to help diagnose issues
+        if not matched_courses and course_ids:
+            logger.info(f"Term '{term}' has {len(course_ids)} course IDs but no valid courses were found")
+        elif matched_courses:
+            logger.info(f"Term '{term}' found {len(matched_courses)} courses")
+        
+        return matched_courses
     
     def get_concentration(self, concentration: str) -> Optional[Dict]:
         """Get concentration data by name"""

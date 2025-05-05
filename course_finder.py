@@ -243,7 +243,15 @@ class CourseFinder:
             confidence = query_info["confidence_scores"].get("terms", 0.7)
             
             for term in query_info["terms"]:
-                term_courses_batch = self.db.get_courses_by_term(term)
+                # Direct database query to ensure ALL matching courses are included
+                # This bypasses any potential filtering issues
+                term_courses_batch = []
+                
+                # Search for the term in all courses
+                for course_id, course in self.db.course_dict.items():
+                    if course.get('term') and term.lower() in course.get('term', '').lower():
+                        term_courses_batch.append(course)
+                
                 term_courses.extend(term_courses_batch)
                 
                 # Adjust confidence based on results
@@ -563,6 +571,13 @@ class CourseFinder:
                     if course['department'] == student_profile["concentration"]:
                         base_score += 0.2
                 
+                # ADDED: Give a baseline score even for courses with null days/times fields
+                # This ensures courses without these fields are still included in results
+                if course.get('days') is None or course.get('start_times') is None or course.get('end_times') is None:
+                    # Give a small boost to ensure it's not filtered out entirely
+                    # but don't artificially inflate its ranking
+                    base_score += 0.05
+                
                 # Store the score
                 rank_data['score'] = base_score
             
@@ -576,8 +591,15 @@ class CourseFinder:
                 )
             ]
             
-            # Return top 10 courses
-            return sorted_courses[:10], confidence
+            # FIXED: Check if user is asking for ALL courses
+            # Look for keywords like "all", "list all", "show all" in the query
+            query_lower = query_info.get("original_query", "").lower()
+            if "all" in query_lower or "every" in query_lower or "list all" in query_lower:
+                # Return all courses, no limit
+                return sorted_courses, confidence
+            else:
+                # For normal queries, return top 10 for better readability
+                return sorted_courses[:10], confidence
         
         return [], 0.0
     
@@ -726,9 +748,21 @@ class CourseFinder:
         return False
     
     def _course_matches_term(self, course: Dict, term: str) -> bool:
-        """Check if course matches term"""
+        """Check if course matches term with extra flexibility"""
+        # Direct string-based term matching
         if 'term' in course and isinstance(course['term'], str):
-            return term.lower() in course['term'].lower()
+            # Case-insensitive contains match
+            if term.lower() in course['term'].lower():
+                return True
+                
+            # Try exact matching term only (e.g., "Fall" would match "2025 Fall")
+            term_parts = term.lower().split()
+            course_term_parts = course['term'].lower().split()
+            
+            # Check if all term parts are in course term
+            if all(part in course_term_parts for part in term_parts):
+                return True
+        
         return False
     
     def _course_above_min_score(self, course: Dict, min_score: float) -> bool:
