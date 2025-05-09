@@ -93,11 +93,14 @@ def safe_word_tokenize(text: str) -> List[str]:
 class HarvardDatabase:
     """Enhanced database for Harvard courses with vector search capabilities"""
     
-    def __init__(self, subjects_df, courses_df, q_reports_df):
+    def __init__(self, subjects_df, courses_df, q_reports_df, dept_map=None):
         """Initialize with the raw dataframes"""
         self.subjects_df = subjects_df
         self.courses_df = courses_df  
         self.q_reports_df = q_reports_df
+        
+        # Internal dept_map - use parameter if provided, otherwise use default
+        self.dept_map = dept_map if dept_map is not None else {}
         
         # Processed data structures
         self.merged_courses = None  # Will hold course data merged with Q reports
@@ -134,7 +137,7 @@ class HarvardDatabase:
             os.makedirs(self.cache_dir)
     
     def process_courses(self) -> None:
-        """Process and clean course data"""
+        """Process and clean course data with improved department handling"""
         try:
             # Clean the courses dataframe
             self.courses_df = self.courses_df.dropna(subset=['class_name', 'course_id'])
@@ -152,31 +155,66 @@ class HarvardDatabase:
                 # Store course in dictionary
                 self.course_dict[course_id] = row.to_dict()
                 
-                # Extract department and number
+                # Extract department and number from class_tag
                 class_tag = row.get('class_tag', '')
-                if isinstance(class_tag, str):
-                    # Try to extract department and number
-                    match = re.search(r'([A-Za-z]+)\s*(\d+)', class_tag)
+                if isinstance(class_tag, str) and class_tag:
+                    # Try standard pattern first (e.g., "MATH 136")
+                    match = re.search(r'([A-Za-z]+-?[A-Za-z]*)\s*(\d+[A-Za-z]*)', class_tag)
                     if match:
                         dept = match.group(1).upper()
-                        num = int(match.group(2))
+                        num_str = match.group(2)
                         
-                        # Store by department and number
-                        key = (dept, num)
-                        if key not in self.dept_course_dict:
-                            self.dept_course_dict[key] = []
-                        self.dept_course_dict[key].append(course_id)
-                        
-                        # Store by course code
-                        course_code = f"{dept} {num}"
-                        self.course_by_code[course_code] = course_id
-                        
-                        # Store by level
-                        level = (num // 10) * 10  # E.g., 136 -> 130
-                        level_key = (dept, level)
-                        if level_key not in self.courses_by_level:
-                            self.courses_by_level[level_key] = []
-                        self.courses_by_level[level_key].append(course_id)
+                        # Try to extract numeric part for level grouping
+                        num_match = re.search(r'(\d+)', num_str)
+                        if num_match:
+                            try:
+                                num = int(num_match.group(1))
+                                
+                                # Store by department and number
+                                key = (dept, num)
+                                if key not in self.dept_course_dict:
+                                    self.dept_course_dict[key] = []
+                                self.dept_course_dict[key].append(course_id)
+                                
+                                # Also store with normalized department name if available
+                                for alias, full_name in self.dept_map.items():
+                                    if alias.upper() == dept:
+                                        alt_key = (alias.upper(), num)
+                                        if alt_key not in self.dept_course_dict:
+                                            self.dept_course_dict[alt_key] = []
+                                        if course_id not in self.dept_course_dict[alt_key]:
+                                            self.dept_course_dict[alt_key].append(course_id)
+                                
+                                # Store by course code
+                                course_code = f"{dept} {num_str}"
+                                self.course_by_code[course_code] = course_id
+                                
+                                # Store alternative department code formats for certain departments
+                                if dept in ['SOC-STD', 'SOCSTD', 'SOC STD']:
+                                    for alt_dept in ['SOC-STD', 'SOCSTD', 'SOC STD']:
+                                        if alt_dept != dept:
+                                            alt_code = f"{alt_dept} {num_str}"
+                                            self.course_by_code[alt_code] = course_id
+                                
+                                # Store by level (e.g., 130-level courses)
+                                level = (num // 10) * 10  # E.g., 136 -> 130
+                                level_key = (dept, level)
+                                if level_key not in self.courses_by_level:
+                                    self.courses_by_level[level_key] = []
+                                self.courses_by_level[level_key].append(course_id)
+                                
+                                # Also store level with alternative department codes
+                                if dept in ['SOC-STD', 'SOCSTD', 'SOC STD']:
+                                    for alt_dept in ['SOC-STD', 'SOCSTD', 'SOC STD']:
+                                        if alt_dept != dept:
+                                            alt_level_key = (alt_dept, level)
+                                            if alt_level_key not in self.courses_by_level:
+                                                self.courses_by_level[alt_level_key] = []
+                                            if course_id not in self.courses_by_level[alt_level_key]:
+                                                self.courses_by_level[alt_level_key].append(course_id)
+                            except (ValueError, TypeError):
+                                # Not a numeric course number, skip level indexing
+                                pass
                 
                 # Store by name
                 class_name = row.get('class_name', '')
@@ -190,6 +228,16 @@ class HarvardDatabase:
                         self.courses_by_term[term] = []
                     self.courses_by_term[term].append(course_id)
                     
+                    # Also store with normalized term formats
+                    # e.g., "Fall 2025" -> also store as "Fall", "2025"
+                    parts = term.lower().split()
+                    for part in parts:
+                        if part in ['fall', 'spring', 'summer', 'winter'] or re.match(r'20\d\d', part):
+                            if part not in self.courses_by_term:
+                                self.courses_by_term[part] = []
+                            if course_id not in self.courses_by_term[part]:
+                                self.courses_by_term[part].append(course_id)
+            
             logger.info(f"Processed {len(self.course_dict)} courses")
             
         except Exception as e:
@@ -903,13 +951,109 @@ class HarvardDatabase:
             return []
     
     def _course_matches_dept(self, course: Dict, dept: str) -> bool:
-        """Check if course matches department"""
+        """Check if course matches department with better handling of dept variations"""
         try:
-            # Check if dept is in class_tag
+            # Normalize the department code
+            dept_upper = dept.upper()
+            
+            # Handle special case for Social Studies
+            social_studies_variants = ['SOCIAL STUDIES', 'SOC-STD', 'SOCSTD', 'SOC STD', 'SOCIAL STUDY', 'SOCSTUDY']
+            is_social_studies_query = dept_upper in social_studies_variants
+            
+            # 1. Check class_tag
             if 'class_tag' in course and isinstance(course['class_tag'], str):
-                return dept.upper() in course['class_tag'].upper()
+                class_tag = course['class_tag'].upper()
+                
+                # Direct substring match
+                if dept_upper in class_tag.split():
+                    return True
+                    
+                # Special case for Social Studies variants
+                if is_social_studies_query and any(variant in class_tag for variant in social_studies_variants):
+                    return True
+                    
+                # Extract just the department code
+                match = re.search(r'([A-Za-z]+-?[A-Za-z]*)\s*\d+', class_tag)
+                if match:
+                    course_dept = match.group(1)
+                    
+                    # Direct match
+                    if course_dept == dept_upper:
+                        return True
+                    
+                    # Match via department mapping
+                    if hasattr(self.db, 'dept_map'):
+                        # From alias -> full name
+                        if dept_upper in self.db.dept_map and self.db.dept_map[dept_upper] == course_dept:
+                            return True
+                        
+                        # From full name -> alias
+                        for alias, full_name in self.db.dept_map.items():
+                            if full_name.upper() == dept_upper and alias.upper() == course_dept:
+                                return True
+                    
+                    # Social Studies special case
+                    if is_social_studies_query and course_dept in social_studies_variants:
+                        return True
+            
+            # 2. Check department field
+            if 'department' in course and isinstance(course['department'], str):
+                dept_field = course['department'].upper()
+                
+                # Direct match
+                if dept_field == dept_upper:
+                    return True
+                    
+                # Special handling for Social Studies
+                if is_social_studies_query and any(variant in dept_field for variant in social_studies_variants):
+                    return True
+                    
+                # Match via department mapping
+                if hasattr(self.db, 'dept_map'):
+                    dept_map = self.db.dept_map
+                    if dept_upper in dept_map and dept_map[dept_upper].upper() == dept_field:
+                        return True
+                    
+                    # Reverse lookup
+                    for alias, full_name in dept_map.items():
+                        if full_name.upper() == dept_upper and alias.upper() == dept_field:
+                            return True
+            
+            # 3. Check subject field
+            if 'subject' in course and isinstance(course['subject'], str):
+                subject = course['subject'].upper()
+                
+                # Direct match
+                if subject == dept_upper:
+                    return True
+                    
+                # Special handling for Social Studies variants
+                if is_social_studies_query and any(variant in subject for variant in social_studies_variants):
+                    return True
+                    
+                # Match via department mapping
+                if hasattr(self.db, 'dept_map'):
+                    dept_map = self.db.dept_map
+                    if dept_upper in dept_map and dept_map[dept_upper].upper() == subject:
+                        return True
+                    
+                    # Reverse lookup
+                    for alias, full_name in dept_map.items():
+                        if full_name.upper() == dept_upper and alias.upper() == subject:
+                            return True
+            
+            # 4. Special handling for interdisciplinary programs
+            if is_social_studies_query:
+                # Check for keywords in description
+                if 'description' in course and isinstance(course['description'], str):
+                    desc = course['description'].upper()
+                    if 'SOCIAL STUDIES' in desc and ('CONCENTRAT' in desc or 'INTRODUCT' in desc):
+                        return True
+            
             return False
-        except Exception:
+        except Exception as e:
+            # Log the error
+            print(f"Error in _course_matches_dept: {str(e)}")
             return False
     
     def _course_matches_level(self, course: Dict, level: int) -> bool:
@@ -926,12 +1070,59 @@ class HarvardDatabase:
             return False
     
     def _course_matches_term(self, course: Dict, term: str) -> bool:
-        """Check if course matches term"""
+        """Check if course matches term with extra flexibility"""
         try:
-            if 'term' in course and isinstance(course['term'], str):
-                return term.lower() in course['term'].lower()
+            if 'term' not in course or not isinstance(course['term'], str):
+                return False
+                
+            course_term = course['term'].lower()
+            term_lower = term.lower()
+            
+            # 1. Direct substring match
+            if term_lower in course_term:
+                return True
+                
+            # 2. Handle cases like "Fall 2025" matching "Fall 2025/2026" and "2025 Fall"
+            term_parts = term_lower.split()
+            course_parts = course_term.split()
+            
+            # Extract seasons and years
+            seasons = ['spring', 'summer', 'fall', 'winter']
+            
+            term_seasons = [part for part in term_parts if part in seasons]
+            term_years = [part for part in term_parts if re.match(r'20\d\d', part)]
+            
+            course_seasons = [part for part in course_parts if part in seasons]
+            course_years = []
+            for part in course_parts:
+                # Handle academic years like "2025/2026"
+                if '/' in part:
+                    year_parts = part.split('/')
+                    for year_part in year_parts:
+                        if re.match(r'20\d\d', year_part):
+                            course_years.append(year_part)
+                elif re.match(r'20\d\d', part):
+                    course_years.append(part)
+            
+            # Check if all specified term components are in the course term
+            if term_seasons and term_years:
+                return any(s in course_seasons for s in term_seasons) and any(y in course_years for y in term_years)
+            elif term_seasons:
+                return any(s in course_seasons for s in term_seasons)
+            elif term_years:
+                return any(y in course_years for y in term_years)
+                
+            # 3. Handle cases where terms might be formatted differently
+            # e.g., "Fall" might be part of a combined term like "Fall-Winter"
+            if any(season in term_lower for season in seasons):
+                for season in seasons:
+                    if season in term_lower and any(season in part for part in course_parts):
+                        return True
+                        
             return False
-        except Exception:
+        except Exception as e:
+            # Log the error
+            print(f"Error in _course_matches_term: {str(e)}")
             return False
     
     def _course_above_min_score(self, course: Dict, min_score: float) -> bool:

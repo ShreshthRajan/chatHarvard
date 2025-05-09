@@ -209,16 +209,102 @@ class CourseFinder:
             if student_profile["concentration"]:
                 # Map concentration to department code
                 dept_map = {
-                    "Mathematics": "MATH",
-                    "Computer Science": "COMPSCI",
-                    "Economics": "ECON",
-                    "History": "HIST",
-                    "English": "ENG",
-                    "Chemistry": "CHEM",
-                    "Physics": "PHYSICS",
-                    "Psychology": "PSY",
-                    "Government": "GOV",
-                    "Sociology": "SOC"
+                    # Mathematics and Computation
+                    'MATH': 'MATHEMATICS',
+                    'MATHS': 'MATHEMATICS',
+                    'PURE MATH': 'MATHEMATICS',
+                    'STAT': 'STATISTICS',
+                    'STATS': 'STATISTICS',
+                    
+                    # Computer Science and Engineering
+                    'COMPSCI': 'COMPUTER SCIENCE',
+                    'CS': 'COMPUTER SCIENCE',
+                    'COMP SCI': 'COMPUTER SCIENCE',
+                    'APMATH': 'APPLIED MATHEMATICS',
+                    'APMTH': 'APPLIED MATHEMATICS',
+                    'AM': 'APPLIED MATHEMATICS',
+                    'BME': 'BIOMEDICAL ENGINEERING',
+                    'EE': 'ELECTRICAL ENGINEERING',
+                    'ES': 'ENGINEERING SCIENCES',
+                    'ESE': 'ENVIRONMENTAL SCIENCE AND ENGINEERING',
+                    'ME': 'MECHANICAL ENGINEERING',
+                    
+                    # Physical Sciences
+                    'PHYS': 'PHYSICS',
+                    'ASTRO': 'ASTROPHYSICS',
+                    'EPS': 'EARTH AND PLANETARY SCIENCES',
+                    
+                    # Life Sciences
+                    'CHEM': 'CHEMISTRY',
+                    'CPB': 'CHEMICAL AND PHYSICAL BIOLOGY',
+                    'HDRB': 'HUMAN DEVELOPMENTAL AND REGENERATIVE BIOLOGY',
+                    'HEB': 'HUMAN EVOLUTIONARY BIOLOGY',
+                    'IB': 'INTEGRATIVE BIOLOGY',
+                    'MCB': 'MOLECULAR AND CELLULAR BIOLOGY',
+                    'NEURO': 'NEUROSCIENCE',
+                    
+                    # Qualitative Social Sciences
+                    'ANTHRO': 'ANTHROPOLOGY',
+                    'FM': 'FOLKLORE AND MYTHOLOGY',
+                    'SOC': 'SOCIOLOGY',
+                    'WGS': 'WOMEN, GENDER, AND SEXUALITY',
+                    
+                    # Quantitative Social Sciences
+                    'AAAS': 'AFRICAN AND AFRICAN AMERICAN STUDIES',
+                    'ECON': 'ECONOMICS',
+                    'GOV': 'GOVERNMENT',
+                    'GOVT': 'GOVERNMENT',
+                    'HIST-SCI': 'HISTORY AND SCIENCE',
+                    'HISTSCI': 'HISTORY AND SCIENCE',
+                    'PSY': 'PSYCHOLOGY',
+                    'PSYCH': 'PSYCHOLOGY',
+                    'SOC-STD': 'SOCIAL STUDIES',
+                    'SOCSTD': 'SOCIAL STUDIES',
+                    'SOC STD': 'SOCIAL STUDIES',
+                    'SOCSTUDY': 'SOCIAL STUDIES',
+                    
+                    # History
+                    'HIST': 'HISTORY',
+                    'HIST-LIT': 'HISTORY AND LITERATURE',
+                    'HISTLIT': 'HISTORY AND LITERATURE',
+                    
+                    # Languages, Literatures, and Religion
+                    'COMPLIT': 'COMPARATIVE LITERATURE',
+                    'EAS': 'EAST ASIAN STUDIES',
+                    'ENGLISH': 'ENGLISH',
+                    'ENG': 'ENGLISH',
+                    'GERMANIC': 'GERMANIC LANGUAGES AND LITERATURES',
+                    'GERMAN': 'GERMANIC LANGUAGES AND LITERATURES',
+                    'NELC': 'NEAR EASTERN LANGUAGES AND CIVILIZATIONS',
+                    'REL': 'RELIGION',
+                    'RELIGION': 'RELIGION',
+                    'RELIG': 'RELIGION',
+                    'ROM-LANG': 'ROMANCE LANGUAGES AND LITERATURES',
+                    'ROMANCE': 'ROMANCE LANGUAGES AND LITERATURES',
+                    'SLAVIC': 'SLAVIC LANGUAGES AND LITERATURES',
+                    
+                    # Arts
+                    'AFVS': 'ART, FILM, AND VISUAL STUDIES',
+                    'VES': 'ART, FILM, AND VISUAL STUDIES', # old name
+                    'ART': 'ART, FILM, AND VISUAL STUDIES',
+                    
+                    # Specific Languages and Regional Studies
+                    'FRENCH': 'ROMANCE LANGUAGES AND LITERATURES',
+                    'SPANISH': 'ROMANCE LANGUAGES AND LITERATURES',
+                    'ITALIAN': 'ROMANCE LANGUAGES AND LITERATURES',
+                    'PORTUGUESE': 'ROMANCE LANGUAGES AND LITERATURES',
+                    'LATIN': 'CLASSICS',
+                    'GREEK': 'CLASSICS',
+                    'CLASSICS': 'CLASSICS',
+                    'CHINESE': 'EAST ASIAN STUDIES',
+                    'JAPANESE': 'EAST ASIAN STUDIES',
+                    'KOREAN': 'EAST ASIAN STUDIES',
+                    'RUSSIAN': 'SLAVIC LANGUAGES AND LITERATURES',
+                    
+                    # Additional common abbreviations
+                    'EXPOS': 'EXPOSITORY WRITING',
+                    'GEN-ED': 'GENERAL EDUCATION',
+                    'GENED': 'GENERAL EDUCATION',
                 }
                 
                 dept = dept_map.get(student_profile["concentration"])
@@ -234,6 +320,33 @@ class CourseFinder:
         
         return level_courses, confidence
     
+    def _find_courses_by_department(self, departments: List[str], student_profile: Dict) -> Tuple[List[Dict], float]:
+        """Find courses by department with better handling of interdisciplinary programs"""
+        dept_courses = []
+        confidence = 0.7  # Base confidence
+        
+        for dept in departments:
+            # Check if this is a known interdisciplinary program that spans multiple departments
+            if dept.upper() == "SOCIAL STUDIES":
+                # For Social Studies, include courses from multiple relevant departments
+                relevant_depts = ["GOV", "HIST", "SOC", "ECON", "SOCSTD", "SOC-STD"]
+                for relevant_dept in relevant_depts:
+                    # Get courses for this department
+                    for course_id, course in self.db.course_dict.items():
+                        if self._course_matches_dept(course, relevant_dept):
+                            dept_courses.append(course)
+            else:
+                # Standard department query
+                for course_id, course in self.db.course_dict.items():
+                    if self._course_matches_dept(course, dept):
+                        dept_courses.append(course)
+        
+        # If no courses found, reduce confidence
+        if not dept_courses:
+            confidence *= 0.8
+        
+        return dept_courses, confidence
+
     def _find_courses_by_term(self, query_info: Dict) -> Tuple[List[Dict], float]:
         """Find courses by term criteria"""
         term_courses = []
@@ -367,7 +480,7 @@ class CourseFinder:
         return filtered_courses, confidence
     
     def _find_semantic_matches(self, query_info: Dict, student_profile: Dict) -> Tuple[List[Dict], float]:
-        """Find courses using semantic search based on query and preferences"""
+        """Find courses using semantic search based on query and preferences with better concentration handling"""
         semantic_matches = []
         confidence = 0.7  # Base confidence for semantic search
         
@@ -377,6 +490,18 @@ class CourseFinder:
         
         # Create a semantic query from the original query and preferences
         semantic_query = query_info["original_query"]
+        
+        # Add concentration-specific terms to the query
+        if student_profile.get("concentration"):
+            concentration = student_profile["concentration"]
+            semantic_query += f" {concentration}"
+            
+            # Add expanded terms for interdisciplinary concentrations
+            if "Social Studies" in concentration:
+                semantic_query += " politics government sociology economics history social theory"
+            elif "History and Literature" in concentration:
+                semantic_query += " literary historical analysis cultural studies"
+            # Add more special cases as needed
         
         # Add explicit preferences to the semantic query
         if query_info["preferences"]:
@@ -401,47 +526,6 @@ class CourseFinder:
             
             if pref_terms:
                 semantic_query += f" {' '.join(pref_terms)}"
-        
-        # Add semantic aspects to enhance the query
-        semantic_aspects = query_info.get("semantic_aspects", {})
-        if semantic_aspects:
-            aspect_terms = []
-            
-            if semantic_aspects.get("difficulty"):
-                difficulty = semantic_aspects["difficulty"]
-                aspect_terms.append(f"{difficulty} difficulty")
-            
-            if semantic_aspects.get("interest_level") == "high":
-                aspect_terms.append("interesting engaging")
-            
-            if semantic_aspects.get("format"):
-                format_type = semantic_aspects["format"]
-                aspect_terms.append(f"{format_type} format")
-            
-            if aspect_terms:
-                semantic_query += f" {' '.join(aspect_terms)}"
-        
-        # Add implicit preferences
-        implicit_prefs = query_info.get("implicit_preferences", [])
-        if implicit_prefs:
-            impl_terms = []
-            
-            for pref in implicit_prefs:
-                if pref == "high_prestige":
-                    impl_terms.append("prestigious well-regarded")
-                elif pref == "small_class":
-                    impl_terms.append("small class intimate setting")
-                elif pref == "good_professor":
-                    impl_terms.append("excellent professor good teaching")
-                elif pref == "minimal_writing":
-                    impl_terms.append("not heavy writing")
-                elif pref == "minimal_reading":
-                    impl_terms.append("not heavy reading")
-                elif pref == "social":
-                    impl_terms.append("collaborative social")
-            
-            if impl_terms:
-                semantic_query += f" {' '.join(impl_terms)}"
         
         # Cache key to avoid redundant searches
         cache_key = f"semantic:{semantic_query}"
@@ -742,10 +826,69 @@ class CourseFinder:
     
     def _course_matches_dept(self, course: Dict, dept: str) -> bool:
         """Check if course matches department"""
-        # Check if dept is in class_tag
-        if 'class_tag' in course and isinstance(course['class_tag'], str):
-            return dept.upper() in course['class_tag'].upper()
-        return False
+        try:
+            # Check if dept is in class_tag
+            if 'class_tag' in course and isinstance(course['class_tag'], str):
+                class_tag = course.get('class_tag', '').upper()
+                dept_upper = dept.upper()
+                
+                # Direct match in class_tag
+                if dept_upper in class_tag:
+                    return True
+                    
+                # Special handling for Social Studies
+                if dept_upper in ["SOCIAL STUDIES", "SOC-STD", "SOCSTD", "SOC STD"] and \
+                any(tag in class_tag for tag in ["SOC-STD", "SOCSTD", "SOC STD"]):
+                    return True
+                    
+                # Check for dept at beginning of class_tag (common format)
+                match = re.search(r'^([A-Za-z-]+)\s*\d+', class_tag)
+                if match and match.group(1) == dept_upper:
+                    return True
+                    
+                # Check through dept_map if available
+                if hasattr(self.db, 'dept_map') and self.db.dept_map:
+                    # Loop through all mappings to find matches
+                    for alias, full_name in self.db.dept_map.items():
+                        # If dept matches alias and class_tag contains that alias
+                        if dept_upper == alias.upper() and alias.upper() in class_tag:
+                            return True
+                        # If dept matches full name and class_tag contains the alias
+                        if dept_upper == full_name.upper() and alias.upper() in class_tag:
+                            return True
+            
+            # Check department field (if available)
+            if 'department' in course and isinstance(course['department'], str):
+                course_dept = course.get('department', '').upper()
+                dept_upper = dept.upper()
+                
+                # Direct match
+                if course_dept == dept_upper:
+                    return True
+                    
+                # Special handling for Social Studies
+                if dept_upper in ["SOCIAL STUDIES", "SOC-STD", "SOCSTD", "SOC STD"] and \
+                any(sd in course_dept for sd in ["SOCIAL STUDIES", "SOC STD", "SOCSTD", "SOC-STD"]):
+                    return True
+                    
+            # Check subject field (if available)
+            if 'subject' in course and isinstance(course['subject'], str):
+                course_subject = course.get('subject', '').upper()
+                dept_upper = dept.upper()
+                
+                # Direct match
+                if course_subject == dept_upper:
+                    return True
+                    
+                # Special handling for Social Studies
+                if dept_upper in ["SOCIAL STUDIES", "SOC-STD", "SOCSTD", "SOC STD"] and \
+                any(sd in course_subject for sd in ["SOCIAL STUDIES", "SOC STD", "SOCSTD", "SOC-STD"]):
+                    return True
+                    
+            return False
+        except Exception:
+            # Robust error handling
+            return False
     
     def _course_matches_term(self, course: Dict, term: str) -> bool:
         """Check if course matches term with extra flexibility"""

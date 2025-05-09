@@ -125,7 +125,6 @@ def token_required(f):
 
     return decorated
 
-# Initialize database
 def initialize_database():
     global harvard_db
     if harvard_db is not None:
@@ -142,7 +141,108 @@ def initialize_database():
         q_reports_df = pd.concat([q_reports_df1, q_reports_df2], ignore_index=True)
 
         logger.info("Initializing database")
+        # Create database without dept_map parameter
         harvard_db = HarvardDatabase(subjects_df, courses_df, q_reports_df)
+        
+        # Add dept_map directly after creation
+        harvard_db.dept_map = {
+            # Mathematics and Computation
+            'MATH': 'MATHEMATICS',
+            'MATHS': 'MATHEMATICS',
+            'PURE MATH': 'MATHEMATICS',
+            'STAT': 'STATISTICS',
+            'STATS': 'STATISTICS',
+            
+            # Computer Science and Engineering
+            'COMPSCI': 'COMPUTER SCIENCE',
+            'CS': 'COMPUTER SCIENCE',
+            'COMP SCI': 'COMPUTER SCIENCE',
+            'APMATH': 'APPLIED MATHEMATICS',
+            'APMTH': 'APPLIED MATHEMATICS',
+            'AM': 'APPLIED MATHEMATICS',
+            'BME': 'BIOMEDICAL ENGINEERING',
+            'EE': 'ELECTRICAL ENGINEERING',
+            'ES': 'ENGINEERING SCIENCES',
+            'ESE': 'ENVIRONMENTAL SCIENCE AND ENGINEERING',
+            'ME': 'MECHANICAL ENGINEERING',
+            
+            # Physical Sciences
+            'PHYS': 'PHYSICS',
+            'ASTRO': 'ASTROPHYSICS',
+            'EPS': 'EARTH AND PLANETARY SCIENCES',
+            
+            # Life Sciences
+            'CHEM': 'CHEMISTRY',
+            'CPB': 'CHEMICAL AND PHYSICAL BIOLOGY',
+            'HDRB': 'HUMAN DEVELOPMENTAL AND REGENERATIVE BIOLOGY',
+            'HEB': 'HUMAN EVOLUTIONARY BIOLOGY',
+            'IB': 'INTEGRATIVE BIOLOGY',
+            'MCB': 'MOLECULAR AND CELLULAR BIOLOGY',
+            'NEURO': 'NEUROSCIENCE',
+            
+            # Qualitative Social Sciences
+            'ANTHRO': 'ANTHROPOLOGY',
+            'FM': 'FOLKLORE AND MYTHOLOGY',
+            'SOC': 'SOCIOLOGY',
+            'WGS': 'WOMEN, GENDER, AND SEXUALITY',
+            
+            # Quantitative Social Sciences
+            'AAAS': 'AFRICAN AND AFRICAN AMERICAN STUDIES',
+            'ECON': 'ECONOMICS',
+            'GOV': 'GOVERNMENT',
+            'GOVT': 'GOVERNMENT',
+            'HIST-SCI': 'HISTORY AND SCIENCE',
+            'HISTSCI': 'HISTORY AND SCIENCE',
+            'PSY': 'PSYCHOLOGY',
+            'PSYCH': 'PSYCHOLOGY',
+            'SOC-STD': 'SOCIAL STUDIES',
+            'SOCSTD': 'SOCIAL STUDIES',
+            'SOC STD': 'SOCIAL STUDIES',
+            'SOCSTUDY': 'SOCIAL STUDIES',
+            
+            # History
+            'HIST': 'HISTORY',
+            'HIST-LIT': 'HISTORY AND LITERATURE',
+            'HISTLIT': 'HISTORY AND LITERATURE',
+            
+            # Languages, Literatures, and Religion
+            'COMPLIT': 'COMPARATIVE LITERATURE',
+            'EAS': 'EAST ASIAN STUDIES',
+            'ENGLISH': 'ENGLISH',
+            'ENG': 'ENGLISH',
+            'GERMANIC': 'GERMANIC LANGUAGES AND LITERATURES',
+            'GERMAN': 'GERMANIC LANGUAGES AND LITERATURES',
+            'NELC': 'NEAR EASTERN LANGUAGES AND CIVILIZATIONS',
+            'REL': 'RELIGION',
+            'RELIGION': 'RELIGION',
+            'RELIG': 'RELIGION',
+            'ROM-LANG': 'ROMANCE LANGUAGES AND LITERATURES',
+            'ROMANCE': 'ROMANCE LANGUAGES AND LITERATURES',
+            'SLAVIC': 'SLAVIC LANGUAGES AND LITERATURES',
+            
+            # Arts
+            'AFVS': 'ART, FILM, AND VISUAL STUDIES',
+            'VES': 'ART, FILM, AND VISUAL STUDIES',
+            'ART': 'ART, FILM, AND VISUAL STUDIES',
+            
+            # Specific Languages and Regional Studies
+            'FRENCH': 'ROMANCE LANGUAGES AND LITERATURES',
+            'SPANISH': 'ROMANCE LANGUAGES AND LITERATURES',
+            'ITALIAN': 'ROMANCE LANGUAGES AND LITERATURES',
+            'PORTUGUESE': 'ROMANCE LANGUAGES AND LITERATURES',
+            'LATIN': 'CLASSICS',
+            'GREEK': 'CLASSICS',
+            'CLASSICS': 'CLASSICS',
+            'CHINESE': 'EAST ASIAN STUDIES',
+            'JAPANESE': 'EAST ASIAN STUDIES',
+            'KOREAN': 'EAST ASIAN STUDIES',
+            'RUSSIAN': 'SLAVIC LANGUAGES AND LITERATURES',
+            
+            # Additional common abbreviations
+            'EXPOS': 'EXPOSITORY WRITING',
+            'GEN-ED': 'GENERAL EDUCATION',
+            'GENED': 'GENERAL EDUCATION',
+        }
 
         # Process the data
         logger.info("Processing courses")
